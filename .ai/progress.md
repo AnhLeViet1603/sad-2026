@@ -64,17 +64,18 @@ M8 - Frontend demo UI.
 - Added React/Vite frontend demo with shop, auth, cart, checkout, orders, AI/review, and admin panels.
 - Added frontend Dockerfile and Docker Compose service on port 3000.
 - Re-ran full Python syntax check and Docker Compose config after frontend changes.
+- Attempted `docker compose build api_gateway`; blocked by Docker access to `C:\Users\hoang\.docker\buildx\instances`. Escalated build permission was not granted, so runtime verification is still pending.
 
 ## In progress
 
-- Local commit for frontend demo UI.
+- Runtime verification when Docker build/run permission is available.
 
 ## Next steps
 
-1. Commit frontend demo UI locally.
-2. Run `docker compose up --build` when dependency/image downloads are allowed.
-3. Run migrations and seed commands in containers.
-4. Test the customer/admin demo flow through the frontend.
+1. Run `docker compose up --build` when Docker permission is available.
+2. Run migrations and seed commands in containers.
+3. Test the customer/admin demo flow through the frontend.
+4. Fix runtime issues found during container testing.
 5. Ask for GitHub remote URL or GitHub CLI authorization before first push.
 
 ## Open questions
