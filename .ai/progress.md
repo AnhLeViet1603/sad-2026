@@ -4,13 +4,14 @@ Last updated: 2026-06-01
 
 ## Current milestone
 
-M3 - Staff service.
+M4 - Product service.
 
 ## Completed
 
 - Initialized Git repository locally.
 - Created first local commit: `5f368cb chore: scaffold microservices skeleton`.
 - Created second local commit: `73937d5 feat: add user auth service APIs`.
+- Created third local commit: `0ed0e13 feat: add staff management APIs`.
 - Created project structure for:
   - `api_gateway`
   - `user_service`
@@ -34,15 +35,18 @@ M3 - Staff service.
 - Added User Service serializers, auth/profile/address views, routes, and initial migration.
 - Added Staff Service models, serializers, CRUD views, routes, initial migration, and `seed_roles` command.
 - Verified Staff Service syntax with `python -m compileall`.
+- Added Product Service models for category, product, image, inventory, dynamic attributes, and pgvector embedding.
+- Added Product Service serializers, CRUD/search/related/inventory/category/export APIs, migration, and `seed_products` command.
+- Verified Product Service syntax with `python -m compileall`.
 
 ## In progress
 
-- M3 local commit for Staff Service.
+- M4 local commit for Product Service.
 
 ## Next steps
 
-1. Commit M3 Staff Service locally.
-2. Add Product Service models, serializers, CRUD/search/export APIs, seed command, and migrations.
+1. Commit M4 Product Service locally.
+2. Add Cart Service models, serializers, cart item APIs, product validation calls, and migration.
 3. Ask for GitHub remote URL or GitHub CLI authorization before first push.
 
 ## Open questions
