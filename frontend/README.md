@@ -1,4 +1,11 @@
 # Frontend
 
-Frontend sẽ được triển khai ở các milestone sau bằng React/Vite theo `.ai/plan.md`.
+React/Vite demo UI for the e-commerce microservices system.
+
+Run through Docker Compose at http://localhost:3000 or locally:
+
+```bash
+npm install
+npm run dev
+```
 
