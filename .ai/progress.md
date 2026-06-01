@@ -4,12 +4,13 @@ Last updated: 2026-06-01
 
 ## Current milestone
 
-M2 - User/Auth service.
+M3 - Staff service.
 
 ## Completed
 
 - Initialized Git repository locally.
 - Created first local commit: `5f368cb chore: scaffold microservices skeleton`.
+- Created second local commit: `73937d5 feat: add user auth service APIs`.
 - Created project structure for:
   - `api_gateway`
   - `user_service`
@@ -31,15 +32,17 @@ M2 - User/Auth service.
 - Added shared JWT utilities and request middleware.
 - Added User Service models: `User`, `Address`, `RefreshToken`.
 - Added User Service serializers, auth/profile/address views, routes, and initial migration.
+- Added Staff Service models, serializers, CRUD views, routes, initial migration, and `seed_roles` command.
+- Verified Staff Service syntax with `python -m compileall`.
 
 ## In progress
 
-- M2 local commit for User/Auth.
+- M3 local commit for Staff Service.
 
 ## Next steps
 
-1. Commit M2 User/Auth locally.
-2. Add Staff Service domain models, serializers, CRUD APIs, seed role command, and migrations.
+1. Commit M3 Staff Service locally.
+2. Add Product Service models, serializers, CRUD/search/export APIs, seed command, and migrations.
 3. Ask for GitHub remote URL or GitHub CLI authorization before first push.
 
 ## Open questions
