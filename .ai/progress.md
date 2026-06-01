@@ -18,6 +18,7 @@ M6 - Payment/Shipping then Order checkout.
 - Created seventh local commit: `9e45258 feat: add demo payment and shipping APIs`.
 - Created eighth local commit: `e1d89e0 feat: add order checkout flow`.
 - Created ninth local commit: `433f54e feat: add product review APIs`.
+- Created tenth local commit: `ab3fb07 feat: add demo ai recommendation APIs`.
 - Created project structure for:
   - `api_gateway`
   - `user_service`
@@ -56,16 +57,19 @@ M6 - Payment/Shipping then Order checkout.
 - Verified Comment Service syntax with `python -m compileall`.
 - Added AI Service demo models, product sync, behavior tracking, home recommendations, and mock chatbot APIs.
 - Verified AI Service syntax with `python -m compileall`.
+- Added API Gateway proxy routing for `/api/users`, `/api/staff`, `/api/products`, `/api/cart`, `/api/orders`, `/api/payments`, `/api/shipping`, `/api/comments`, and `/api/ai`.
+- Gateway forwards authorization and derived user headers.
+- Verified API Gateway syntax with `python -m compileall`.
 
 ## In progress
 
-- Local commit for AI demo APIs.
+- Local commit for API Gateway proxy routes.
 
 ## Next steps
 
-1. Commit AI demo APIs locally.
-2. Add API Gateway proxy routes.
-3. Add frontend customer/admin demo UI.
+1. Commit API Gateway proxy routes locally.
+2. Add frontend customer/admin demo UI.
+3. Run broader syntax checks and Docker Compose config.
 4. Ask for GitHub remote URL or GitHub CLI authorization before first push.
 
 ## Open questions
