@@ -17,6 +17,7 @@ M6 - Payment/Shipping then Order checkout.
 - Created sixth local commit: `0a62382 docs: update progress after cart service`.
 - Created seventh local commit: `9e45258 feat: add demo payment and shipping APIs`.
 - Created eighth local commit: `e1d89e0 feat: add order checkout flow`.
+- Created ninth local commit: `433f54e feat: add product review APIs`.
 - Created project structure for:
   - `api_gateway`
   - `user_service`
@@ -53,18 +54,19 @@ M6 - Payment/Shipping then Order checkout.
 - Verified Order Service syntax with `python -m compileall`.
 - Added Comment Service review/reply models, serializers, review list/create, product reviews, rating summary, reply APIs, and migration.
 - Verified Comment Service syntax with `python -m compileall`.
+- Added AI Service demo models, product sync, behavior tracking, home recommendations, and mock chatbot APIs.
+- Verified AI Service syntax with `python -m compileall`.
 
 ## In progress
 
-- Local commit for Comment Service review APIs.
+- Local commit for AI demo APIs.
 
 ## Next steps
 
-1. Commit Comment Service review APIs locally.
-2. Add AI mock tracking/recommendation/chat APIs.
-3. Add API Gateway proxy routes.
-4. Add frontend customer/admin demo UI.
-5. Ask for GitHub remote URL or GitHub CLI authorization before first push.
+1. Commit AI demo APIs locally.
+2. Add API Gateway proxy routes.
+3. Add frontend customer/admin demo UI.
+4. Ask for GitHub remote URL or GitHub CLI authorization before first push.
 
 ## Open questions
 
