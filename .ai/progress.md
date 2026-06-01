@@ -20,6 +20,8 @@ M8 - Frontend demo UI.
 - Created ninth local commit: `433f54e feat: add product review APIs`.
 - Created tenth local commit: `ab3fb07 feat: add demo ai recommendation APIs`.
 - Created eleventh local commit: `e33f175 feat: add api gateway proxy routes`.
+- Created twelfth local commit: `e8bc9d3 feat: add frontend demo UI`.
+- Created thirteenth local commit: `2e5886d docs: note pending runtime verification`.
 - Created project structure for:
   - `api_gateway`
   - `user_service`
@@ -65,18 +67,24 @@ M8 - Frontend demo UI.
 - Added frontend Dockerfile and Docker Compose service on port 3000.
 - Re-ran full Python syntax check and Docker Compose config after frontend changes.
 - Attempted `docker compose build api_gateway`; blocked by Docker access to `C:\Users\hoang\.docker\buildx\instances`. Escalated build permission was not granted, so runtime verification is still pending.
+- Added Gemini API environment variables for generation and embeddings.
+- Added true demo RAG plumbing: product documents, Gemini/fallback embeddings, pgvector vector search, hybrid retrieval, and Gemini grounded response generation.
+- Added Neo4j graph upsert/tracking and graph-based home recommendation fallback path.
+- Added AI endpoints: `/api/ai/rebuild-embeddings` and `/api/ai/search`.
 
 ## In progress
 
-- Runtime verification when Docker build/run permission is available.
+- Product detail UI and AI admin controls.
 
 ## Next steps
 
-1. Run `docker compose up --build` when Docker permission is available.
-2. Run migrations and seed commands in containers.
-3. Test the customer/admin demo flow through the frontend.
-4. Fix runtime issues found during container testing.
-5. Ask for GitHub remote URL or GitHub CLI authorization before first push.
+1. Add product detail UI.
+2. Add admin controls for AI product sync and embedding rebuild.
+3. Commit Gemini/RAG/Neo4j/detail changes locally.
+4. Run `docker compose up --build` when Docker permission is available.
+5. Run migrations and seed commands in containers.
+6. Test the customer/admin demo flow through the frontend.
+7. Ask for GitHub remote URL or GitHub CLI authorization before first push.
 
 ## Open questions
 

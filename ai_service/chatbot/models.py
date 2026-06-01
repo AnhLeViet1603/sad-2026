@@ -1,4 +1,5 @@
 from django.db import models
+from pgvector.django import VectorField
 
 
 class ProductDocument(models.Model):
@@ -9,6 +10,8 @@ class ProductDocument(models.Model):
     brand = models.CharField(max_length=255, null=True, blank=True)
     price = models.DecimalField(max_digits=12, decimal_places=2)
     stock = models.PositiveIntegerField(default=0)
+    document = models.TextField(default="")
+    embedding = VectorField(dimensions=3072, null=True, blank=True)
     updated_at = models.DateTimeField(auto_now=True)
 
 
@@ -46,4 +49,3 @@ class ChatMessage(models.Model):
     content = models.TextField()
     products = models.JSONField(default=list, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
-
