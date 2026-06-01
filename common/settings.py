@@ -44,6 +44,7 @@ def configure(globals_dict, service_name, local_app, db_kind="sqlite"):
             "django.middleware.common.CommonMiddleware",
             "django.middleware.csrf.CsrfViewMiddleware",
             "django.contrib.auth.middleware.AuthenticationMiddleware",
+            "common.middleware.JWTAuthenticationMiddleware",
             "django.contrib.messages.middleware.MessageMiddleware",
             "django.middleware.clickjacking.XFrameOptionsMiddleware",
         ],
@@ -93,4 +94,3 @@ def configure(globals_dict, service_name, local_app, db_kind="sqlite"):
         }
 
     globals_dict["DATABASES"] = {"default": database}
-
