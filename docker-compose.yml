@@ -1,0 +1,161 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-ecom}
+      POSTGRES_USER: ${POSTGRES_USER:-ecom}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ecom}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ecom} -d ${POSTGRES_DB:-ecom}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-ecom}
+      MYSQL_USER: ${MYSQL_USER:-ecom}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-ecom}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p${MYSQL_ROOT_PASSWORD:-root}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  neo4j:
+    image: neo4j:5
+    environment:
+      NEO4J_AUTH: ${NEO4J_USER:-neo4j}/${NEO4J_PASSWORD:-password}
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    volumes:
+      - neo4j_data:/data
+
+  api_gateway:
+    build:
+      context: .
+      dockerfile: api_gateway/Dockerfile
+    env_file: .env
+    ports:
+      - "8000:8000"
+    depends_on:
+      - user_service
+      - product_service
+
+  user_service:
+    build:
+      context: .
+      dockerfile: user_service/Dockerfile
+    env_file: .env
+    ports:
+      - "8001:8001"
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  staff_service:
+    build:
+      context: .
+      dockerfile: staff_service/Dockerfile
+    env_file: .env
+    ports:
+      - "8002:8002"
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  product_service:
+    build:
+      context: .
+      dockerfile: product_service/Dockerfile
+    env_file: .env
+    ports:
+      - "8003:8003"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  cart_service:
+    build:
+      context: .
+      dockerfile: cart_service/Dockerfile
+    env_file: .env
+    ports:
+      - "8004:8004"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  order_service:
+    build:
+      context: .
+      dockerfile: order_service/Dockerfile
+    env_file: .env
+    ports:
+      - "8005:8005"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  payment_service:
+    build:
+      context: .
+      dockerfile: payment_service/Dockerfile
+    env_file: .env
+    ports:
+      - "8006:8006"
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  shipping_service:
+    build:
+      context: .
+      dockerfile: shipping_service/Dockerfile
+    env_file: .env
+    ports:
+      - "8007:8007"
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  comment_service:
+    build:
+      context: .
+      dockerfile: comment_service/Dockerfile
+    env_file: .env
+    ports:
+      - "8008:8008"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  ai_service:
+    build:
+      context: .
+      dockerfile: ai_service/Dockerfile
+    env_file: .env
+    ports:
+      - "8009:8009"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      neo4j:
+        condition: service_started
+
+volumes:
+  postgres_data:
+  mysql_data:
+  neo4j_data:
+
