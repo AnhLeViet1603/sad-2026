@@ -16,6 +16,7 @@ M6 - Payment/Shipping then Order checkout.
 - Created fifth local commit: `eef732d feat: add cart service APIs`.
 - Created sixth local commit: `0a62382 docs: update progress after cart service`.
 - Created seventh local commit: `9e45258 feat: add demo payment and shipping APIs`.
+- Created eighth local commit: `e1d89e0 feat: add order checkout flow`.
 - Created project structure for:
   - `api_gateway`
   - `user_service`
@@ -50,17 +51,19 @@ M6 - Payment/Shipping then Order checkout.
 - Added Order Service models, serializers, checkout orchestration, list/detail/status APIs, and migration.
 - Order checkout now calls Cart, Payment, and Shipping services and clears the cart after successful orchestration.
 - Verified Order Service syntax with `python -m compileall`.
+- Added Comment Service review/reply models, serializers, review list/create, product reviews, rating summary, reply APIs, and migration.
+- Verified Comment Service syntax with `python -m compileall`.
 
 ## In progress
 
-- Local commit for Order checkout.
+- Local commit for Comment Service review APIs.
 
 ## Next steps
 
-1. Commit Order checkout locally.
-2. Add Comment Service review APIs.
-3. Add AI mock tracking/recommendation/chat APIs.
-4. Add API Gateway proxy routes.
+1. Commit Comment Service review APIs locally.
+2. Add AI mock tracking/recommendation/chat APIs.
+3. Add API Gateway proxy routes.
+4. Add frontend customer/admin demo UI.
 5. Ask for GitHub remote URL or GitHub CLI authorization before first push.
 
 ## Open questions
