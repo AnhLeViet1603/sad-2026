@@ -4,7 +4,7 @@ Last updated: 2026-06-01
 
 ## Current milestone
 
-M5 - Cart service.
+M6 - Payment/Shipping then Order checkout.
 
 ## Completed
 
@@ -13,6 +13,7 @@ M5 - Cart service.
 - Created second local commit: `73937d5 feat: add user auth service APIs`.
 - Created third local commit: `0ed0e13 feat: add staff management APIs`.
 - Created fourth local commit: `60088f3 feat: add product catalog APIs`.
+- Created fifth local commit: `eef732d feat: add cart service APIs`.
 - Created project structure for:
   - `api_gateway`
   - `user_service`
@@ -44,13 +45,13 @@ M5 - Cart service.
 
 ## In progress
 
-- M5 local commit for Cart Service.
+- Payment and Shipping service skeleton domain APIs.
 
 ## Next steps
 
-1. Commit M5 Cart Service locally.
-2. Add Payment and Shipping service skeleton domain APIs to unblock checkout integration.
-3. Add Order Service checkout flow.
+1. Add Payment and Shipping service skeleton domain APIs to unblock checkout integration.
+2. Add Order Service checkout flow.
+3. Add Comment Service review APIs.
 4. Ask for GitHub remote URL or GitHub CLI authorization before first push.
 
 ## Open questions
