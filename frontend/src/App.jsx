@@ -12,6 +12,10 @@ function App() {
   const [cart, setCart] = useState(null);
   const [orders, setOrders] = useState([]);
   const [recommendations, setRecommendations] = useState([]);
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [productReviews, setProductReviews] = useState([]);
+  const [ratingSummary, setRatingSummary] = useState(null);
+  const [relatedProducts, setRelatedProducts] = useState([]);
   const [message, setMessage] = useState("");
 
   const api = useMemo(() => {
@@ -77,6 +81,21 @@ function App() {
     setMessage("Đã thêm vào giỏ hàng");
   }
 
+  async function openProductDetail(productId) {
+    const [productResponse, relatedResponse, reviewsResponse, summaryResponse] = await Promise.all([
+      api.get(`/api/products/${productId}`),
+      api.get(`/api/products/${productId}/related`).catch(() => ({ data: { data: [] } })),
+      api.get(`/api/comments/products/${productId}/reviews`).catch(() => ({ data: { data: [] } })),
+      api.get(`/api/comments/products/${productId}/summary`).catch(() => ({ data: { data: null } })),
+    ]);
+    setSelectedProduct(productResponse.data.data);
+    setRelatedProducts(relatedResponse.data.data || []);
+    setProductReviews(reviewsResponse.data.data || []);
+    setRatingSummary(summaryResponse.data.data);
+    setView("product-detail");
+    await api.post("/api/ai/track", { product_id: productId, event_type: "VIEWED" }).catch(() => {});
+  }
+
   async function checkout(event) {
     event.preventDefault();
     const data = Object.fromEntries(new FormData(event.currentTarget));
@@ -101,6 +120,16 @@ function App() {
     const data = Object.fromEntries(new FormData(event.currentTarget));
     await api.post("/api/comments/reviews", data);
     await api.post("/api/ai/track", { product_id: Number(data.product_id), event_type: "RATED" }).catch(() => {});
+    setMessage("Đã gửi đánh giá");
+  }
+
+  async function reviewFromDetail(event) {
+    event.preventDefault();
+    if (!selectedProduct) return;
+    const data = Object.fromEntries(new FormData(event.currentTarget));
+    await api.post("/api/comments/reviews", { ...data, product_id: selectedProduct.id });
+    await api.post("/api/ai/track", { product_id: selectedProduct.id, event_type: "RATED" }).catch(() => {});
+    await openProductDetail(selectedProduct.id);
     setMessage("Đã gửi đánh giá");
   }
 
@@ -132,7 +161,19 @@ function App() {
 
       {!token && <AuthPanel onSubmit={handleAuth} showError={showError} />}
 
-      {view === "shop" && <Shop products={products} onAdd={addToCart} />}
+      {view === "shop" && <Shop products={products} onAdd={addToCart} onOpen={openProductDetail} />}
+      {view === "product-detail" && selectedProduct && (
+        <ProductDetail
+          product={selectedProduct}
+          reviews={productReviews}
+          summary={ratingSummary}
+          related={relatedProducts}
+          onAdd={addToCart}
+          onOpen={openProductDetail}
+          onReview={reviewFromDetail}
+          showError={showError}
+        />
+      )}
       {view === "cart" && <Cart cart={cart} reload={loadCart} api={api} showError={showError} />}
       {view === "checkout" && <Checkout cart={cart} onSubmit={checkout} showError={showError} />}
       {view === "orders" && <Orders orders={orders} api={api} reload={loadOrders} showError={showError} />}
@@ -160,7 +201,7 @@ function AuthPanel({ onSubmit, showError }) {
   );
 }
 
-function Shop({ products, onAdd }) {
+function Shop({ products, onAdd, onOpen }) {
   return (
     <section className="grid">
       {products.map((product) => (
@@ -170,10 +211,58 @@ function Shop({ products, onAdd }) {
           <p>{product.description}</p>
           <div className="row">
             <strong>{Number(product.price).toLocaleString("vi-VN")}đ</strong>
+            <button onClick={() => onOpen(product.id)}>Detail</button>
             <button onClick={() => onAdd(product)}>Add</button>
           </div>
         </article>
       ))}
+    </section>
+  );
+}
+
+function ProductDetail({ product, reviews, summary, related, onAdd, onOpen, onReview, showError }) {
+  return (
+    <section className="detail-layout">
+      <div className="detail-media">
+        <img src={product.images?.[0]?.image_url || "https://picsum.photos/seed/detail/800/600"} alt={product.name} />
+      </div>
+      <div className="detail-main">
+        <p className="eyebrow">{product.brand || "Demo product"}</p>
+        <h2>{product.name}</h2>
+        <p>{product.description}</p>
+        <div className="row">
+          <strong>{Number(product.price).toLocaleString("vi-VN")}đ</strong>
+          <span>{product.inventory?.available_quantity ?? 0} in stock</span>
+          <button onClick={() => onAdd(product).catch(showError)}>Add to cart</button>
+        </div>
+        <div className="summary">
+          <strong>{summary?.avg_rating || 0}/5</strong>
+          <span>{summary?.review_count || 0} reviews</span>
+        </div>
+        <form className="form-grid" onSubmit={(event) => onReview(event).catch(showError)}>
+          <input name="rating" type="number" min="1" max="5" placeholder="Rating" required />
+          <input name="title" placeholder="Title" />
+          <input name="content" placeholder="Review content" required />
+          <button type="submit">Review</button>
+        </form>
+      </div>
+      <div className="band detail-section">
+        <h2>Reviews</h2>
+        {reviews.map((review) => (
+          <div className="review" key={review.id}>
+            <strong>{review.rating}/5 {review.title}</strong>
+            <p>{review.content}</p>
+          </div>
+        ))}
+      </div>
+      <div className="band detail-section">
+        <h2>Related products</h2>
+        <div className="recommendations">
+          {related.map((item) => (
+            <button key={item.id} onClick={() => onOpen(item.id).catch(showError)}>{item.name}</button>
+          ))}
+        </div>
+      </div>
     </section>
   );
 }
@@ -271,6 +360,9 @@ function AdminPanel({ api, products, reloadProducts, reloadOrders, showError }) 
     await api.post("/api/ai/sync-products");
     await reloadProducts();
   }
+  async function rebuildEmbeddings() {
+    await api.post("/api/ai/rebuild-embeddings");
+  }
   async function createCategory(event) {
     event.preventDefault();
     await api.post("/api/products/categories", Object.fromEntries(new FormData(event.currentTarget)));
@@ -283,6 +375,7 @@ function AdminPanel({ api, products, reloadProducts, reloadOrders, showError }) 
         <button onClick={() => reloadProducts().catch(showError)}>Reload products</button>
         <button onClick={() => reloadOrders().catch(showError)}>Reload orders</button>
         <button onClick={() => seedProducts().catch(showError)}>Sync AI products</button>
+        <button onClick={() => rebuildEmbeddings().catch(showError)}>Rebuild embeddings</button>
       </div>
       <form className="form-grid" onSubmit={(event) => createCategory(event).catch(showError)}>
         <input name="name" placeholder="Category name" required />
@@ -295,4 +388,3 @@ function AdminPanel({ api, products, reloadProducts, reloadOrders, showError }) 
 }
 
 createRoot(document.getElementById("root")).render(<App />);
-

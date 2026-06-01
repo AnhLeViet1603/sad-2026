@@ -71,20 +71,21 @@ M8 - Frontend demo UI.
 - Added true demo RAG plumbing: product documents, Gemini/fallback embeddings, pgvector vector search, hybrid retrieval, and Gemini grounded response generation.
 - Added Neo4j graph upsert/tracking and graph-based home recommendation fallback path.
 - Added AI endpoints: `/api/ai/rebuild-embeddings` and `/api/ai/search`.
+- Added product detail UI view with detail fetch, VIEWED tracking, rating summary, reviews, related products, add-to-cart, and review form.
+- Added admin UI control to rebuild AI embeddings.
+- Added Gemini environment placeholders to local `.env` and `.env.example`.
 
 ## In progress
 
-- Product detail UI and AI admin controls.
+- Local commit for product detail UI and AI admin controls.
 
 ## Next steps
 
-1. Add product detail UI.
-2. Add admin controls for AI product sync and embedding rebuild.
-3. Commit Gemini/RAG/Neo4j/detail changes locally.
-4. Run `docker compose up --build` when Docker permission is available.
-5. Run migrations and seed commands in containers.
-6. Test the customer/admin demo flow through the frontend.
-7. Ask for GitHub remote URL or GitHub CLI authorization before first push.
+1. Commit product detail UI and AI admin controls locally.
+2. Run `docker compose up --build` when Docker permission is available.
+3. Run migrations and seed commands in containers.
+4. Test the customer/admin demo flow through the frontend.
+5. Ask for GitHub remote URL or GitHub CLI authorization before first push.
 
 ## Open questions
 
