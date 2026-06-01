@@ -4,7 +4,7 @@ Last updated: 2026-06-01
 
 ## Current milestone
 
-M4 - Product service.
+M5 - Cart service.
 
 ## Completed
 
@@ -12,6 +12,7 @@ M4 - Product service.
 - Created first local commit: `5f368cb chore: scaffold microservices skeleton`.
 - Created second local commit: `73937d5 feat: add user auth service APIs`.
 - Created third local commit: `0ed0e13 feat: add staff management APIs`.
+- Created fourth local commit: `60088f3 feat: add product catalog APIs`.
 - Created project structure for:
   - `api_gateway`
   - `user_service`
@@ -38,16 +39,19 @@ M4 - Product service.
 - Added Product Service models for category, product, image, inventory, dynamic attributes, and pgvector embedding.
 - Added Product Service serializers, CRUD/search/related/inventory/category/export APIs, migration, and `seed_products` command.
 - Verified Product Service syntax with `python -m compileall`.
+- Added Cart Service models, serializers, Product Service validation client, cart APIs, and initial migration.
+- Verified Cart Service syntax with `python -m compileall`.
 
 ## In progress
 
-- M4 local commit for Product Service.
+- M5 local commit for Cart Service.
 
 ## Next steps
 
-1. Commit M4 Product Service locally.
-2. Add Cart Service models, serializers, cart item APIs, product validation calls, and migration.
-3. Ask for GitHub remote URL or GitHub CLI authorization before first push.
+1. Commit M5 Cart Service locally.
+2. Add Payment and Shipping service skeleton domain APIs to unblock checkout integration.
+3. Add Order Service checkout flow.
+4. Ask for GitHub remote URL or GitHub CLI authorization before first push.
 
 ## Open questions
 
