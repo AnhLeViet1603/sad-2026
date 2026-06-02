@@ -253,7 +253,8 @@ def track_behavior_graph(user_id, product_id, event_type):
                 MERGE (u:User {{id: $user_id}})
                 MERGE (p:Product {{id: $product_id}})
                 MERGE (u)-[r:{relation}]->(p)
-                SET r.updated_at = datetime()
+                SET r.count = coalesce(r.count, 0) + 1,
+                    r.updated_at = datetime()
                 """,
                 user_id=int(user_id),
                 product_id=int(product_id),
@@ -272,9 +273,17 @@ def graph_recommendation_ids(user_id, limit=8):
         with driver.session() as session:
             result = session.run(
                 """
-                MATCH (u:User {id: $user_id})-[:VIEWED|ADDED_TO_CART|PURCHASED|RATED]->(:Product)-[:IN_CATEGORY]->(c:Category)<-[:IN_CATEGORY]-(rec:Product)
+                MATCH (u:User {id: $user_id})-[r:VIEWED|ADDED_TO_CART|PURCHASED|RATED]->(:Product)-[:IN_CATEGORY]->(c:Category)<-[:IN_CATEGORY]-(rec:Product)
                 WHERE NOT (u)-[:VIEWED|ADDED_TO_CART|PURCHASED|RATED]->(rec)
-                RETURN rec.id AS product_id, count(*) AS score
+                WITH rec, sum(
+                    CASE type(r)
+                        WHEN 'PURCHASED' THEN 5
+                        WHEN 'ADDED_TO_CART' THEN 3
+                        WHEN 'RATED' THEN 2
+                        ELSE 1
+                    END * coalesce(r.count, 1)
+                ) AS score
+                RETURN rec.id AS product_id, score
                 ORDER BY score DESC
                 LIMIT $limit
                 """,
@@ -292,4 +301,3 @@ def graph_recommendation_products(user_id, limit=8):
         return []
     products = {product.product_id: product for product in ProductDocument.objects.filter(product_id__in=ids)}
     return [products[product_id] for product_id in ids if product_id in products]
-

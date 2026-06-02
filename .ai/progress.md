@@ -4,7 +4,7 @@ Last updated: 2026-06-02
 
 ## Current milestone
 
-M9 - Docker build and system flow verification.
+M10 - Modern ecommerce UI and purchased graph demo.
 
 ## Completed
 
@@ -89,16 +89,24 @@ M9 - Docker build and system flow verification.
 - Verified backend health endpoints on ports 8000-8009 and frontend on port 3000.
 - Seeded 30 demo products from inside `product_service`.
 - Verified gateway end-to-end flow: register, login, profile, product list, add cart item, AI behavior tracking, checkout, payment success simulation, review creation, AI product sync, recommendations, and chat.
+- Added a focused plan for the next UI/graph iteration in `.ai/plan-ui-purchased.md`.
+- Redesigned the frontend into a more modern ecommerce storefront with top navigation, search, category chips, product rails, product detail, cart, checkout, orders, assistant, and operations views.
+- Wired checkout success to send `PURCHASED` tracking events through the existing `/api/ai/track` endpoint.
+- Added Neo4j relationship `count` updates for tracked behavior.
+- Updated graph recommendation scoring so `PURCHASED` behavior weighs more than `ADDED_TO_CART`, `RATED`, and `VIEWED`.
+- Added `seed_graph_demo` management command in AI Service to seed supported behavior events, including `PURCHASED`.
+- Verified Docker frontend production build through `docker compose up -d --build`.
+- Verified `seed_graph_demo` creates 160 behavior events across 10 demo users, including 30 `PURCHASED` relationships.
+- Verified checkout flow through the gateway creates a `PURCHASED` relationship in Neo4j and returns graph-based recommendations.
 
 ## In progress
 
-- Local commit for product detail UI and AI admin controls.
-- Local commit for Docker optimization and runtime verification changes.
+- Local commit for modern ecommerce UI and purchased graph demo changes.
 
 ## Next steps
 
-1. Review and commit product detail UI, AI admin controls, Docker optimization, and runtime verification changes locally.
-2. Run a manual browser smoke test through the frontend at `http://localhost:3000`.
+1. Run a manual browser smoke test through the frontend at `http://localhost:3000`.
+2. Commit modern ecommerce UI and purchased graph demo changes locally.
 3. Ask for GitHub remote URL or GitHub CLI authorization before first push.
 
 ## Open questions
