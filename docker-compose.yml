@@ -9,6 +9,7 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./docker/init/postgres:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ecom} -d ${POSTGRES_DB:-ecom}"]
       interval: 10s
@@ -26,6 +27,7 @@ services:
       - "3306:3306"
     volumes:
       - mysql_data:/var/lib/mysql
+      - ./docker/init/mysql:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p${MYSQL_ROOT_PASSWORD:-root}"]
       interval: 10s
@@ -45,107 +47,175 @@ services:
   api_gateway:
     build:
       context: .
-      dockerfile: api_gateway/Dockerfile
+      dockerfile: docker/backend.Dockerfile
+      target: api_gateway
     env_file: .env
     ports:
       - "8000:8000"
     depends_on:
       - user_service
       - product_service
+    networks:
+      default:
+        aliases:
+          - api-gateway
 
   user_service:
     build:
       context: .
-      dockerfile: user_service/Dockerfile
+      dockerfile: docker/backend.Dockerfile
+      target: user_service
     env_file: .env
+    environment:
+      DB_NAME: user_service
+      STARTUP_DELAY: 15
     ports:
       - "8001:8001"
     depends_on:
       mysql:
         condition: service_healthy
+    networks:
+      default:
+        aliases:
+          - user-service
 
   staff_service:
     build:
       context: .
-      dockerfile: staff_service/Dockerfile
+      dockerfile: docker/backend.Dockerfile
+      target: staff_service
     env_file: .env
+    environment:
+      DB_NAME: staff_service
+      STARTUP_DELAY: 15
     ports:
       - "8002:8002"
     depends_on:
       mysql:
         condition: service_healthy
+    networks:
+      default:
+        aliases:
+          - staff-service
 
   product_service:
     build:
       context: .
-      dockerfile: product_service/Dockerfile
+      dockerfile: docker/backend.Dockerfile
+      target: product_service
     env_file: .env
+    environment:
+      DB_NAME: product_service
     ports:
       - "8003:8003"
     depends_on:
       postgres:
         condition: service_healthy
+    networks:
+      default:
+        aliases:
+          - product-service
 
   cart_service:
     build:
       context: .
-      dockerfile: cart_service/Dockerfile
+      dockerfile: docker/backend.Dockerfile
+      target: cart_service
     env_file: .env
+    environment:
+      DB_NAME: cart_service
     ports:
       - "8004:8004"
     depends_on:
       postgres:
         condition: service_healthy
+    networks:
+      default:
+        aliases:
+          - cart-service
 
   order_service:
     build:
       context: .
-      dockerfile: order_service/Dockerfile
+      dockerfile: docker/backend.Dockerfile
+      target: order_service
     env_file: .env
+    environment:
+      DB_NAME: order_service
     ports:
       - "8005:8005"
     depends_on:
       postgres:
         condition: service_healthy
+    networks:
+      default:
+        aliases:
+          - order-service
 
   payment_service:
     build:
       context: .
-      dockerfile: payment_service/Dockerfile
+      dockerfile: docker/backend.Dockerfile
+      target: payment_service
     env_file: .env
+    environment:
+      DB_NAME: payment_service
+      STARTUP_DELAY: 15
     ports:
       - "8006:8006"
     depends_on:
       mysql:
         condition: service_healthy
+    networks:
+      default:
+        aliases:
+          - payment-service
 
   shipping_service:
     build:
       context: .
-      dockerfile: shipping_service/Dockerfile
+      dockerfile: docker/backend.Dockerfile
+      target: shipping_service
     env_file: .env
+    environment:
+      DB_NAME: shipping_service
+      STARTUP_DELAY: 15
     ports:
       - "8007:8007"
     depends_on:
       mysql:
         condition: service_healthy
+    networks:
+      default:
+        aliases:
+          - shipping-service
 
   comment_service:
     build:
       context: .
-      dockerfile: comment_service/Dockerfile
+      dockerfile: docker/backend.Dockerfile
+      target: comment_service
     env_file: .env
+    environment:
+      DB_NAME: comment_service
     ports:
       - "8008:8008"
     depends_on:
       postgres:
         condition: service_healthy
+    networks:
+      default:
+        aliases:
+          - comment-service
 
   ai_service:
     build:
       context: .
-      dockerfile: ai_service/Dockerfile
+      dockerfile: docker/backend.Dockerfile
+      target: ai_service
     env_file: .env
+    environment:
+      DB_NAME: ai_service
     ports:
       - "8009:8009"
     depends_on:
@@ -153,15 +223,19 @@ services:
         condition: service_healthy
       neo4j:
         condition: service_started
+    networks:
+      default:
+        aliases:
+          - ai-service
 
   frontend:
     build:
       context: .
       dockerfile: frontend/Dockerfile
-    environment:
-      VITE_API_BASE_URL: http://localhost:8000
+      args:
+        VITE_API_BASE_URL: http://localhost:8000
     ports:
-      - "3000:3000"
+      - "3000:80"
     depends_on:
       - api_gateway
 

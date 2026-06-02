@@ -30,8 +30,7 @@ class Address(models.Model):
 
 class RefreshToken(models.Model):
     user_id = models.BigIntegerField(db_index=True)
-    token = models.TextField(unique=True)
+    token = models.CharField(max_length=255, unique=True)
     is_revoked = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     revoked_at = models.DateTimeField(null=True, blank=True)
-

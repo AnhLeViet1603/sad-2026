@@ -1,4 +1,5 @@
 import datetime
+import uuid
 
 import jwt
 from django.conf import settings
@@ -30,6 +31,7 @@ def create_refresh_token(user_id, role="USER"):
         "user_id": user_id,
         "role": role,
         "type": "refresh",
+        "jti": uuid.uuid4().hex,
         "exp": issued_at + datetime.timedelta(days=REFRESH_TOKEN_DAYS),
         "iat": issued_at,
     }
@@ -45,4 +47,3 @@ def get_bearer_token(request):
     if not header.startswith("Bearer "):
         return None
     return header.removeprefix("Bearer ").strip()
-

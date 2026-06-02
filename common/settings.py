@@ -74,7 +74,7 @@ def configure(globals_dict, service_name, local_app, db_kind="sqlite"):
             "ENGINE": "django.db.backends.postgresql",
             "HOST": os.getenv("POSTGRES_HOST", "localhost"),
             "PORT": os.getenv("POSTGRES_PORT", "5432"),
-            "NAME": os.getenv("POSTGRES_DB", "ecom"),
+            "NAME": os.getenv("DB_NAME", os.getenv("POSTGRES_DB", "ecom")),
             "USER": os.getenv("POSTGRES_USER", "ecom"),
             "PASSWORD": os.getenv("POSTGRES_PASSWORD", "ecom"),
         }
@@ -83,7 +83,7 @@ def configure(globals_dict, service_name, local_app, db_kind="sqlite"):
             "ENGINE": "django.db.backends.mysql",
             "HOST": os.getenv("MYSQL_HOST", "localhost"),
             "PORT": os.getenv("MYSQL_PORT", "3306"),
-            "NAME": os.getenv("MYSQL_DATABASE", "ecom"),
+            "NAME": os.getenv("DB_NAME", os.getenv("MYSQL_DATABASE", "ecom")),
             "USER": os.getenv("MYSQL_USER", "ecom"),
             "PASSWORD": os.getenv("MYSQL_PASSWORD", "ecom"),
         }

@@ -25,7 +25,7 @@ class Migration(migrations.Migration):
             fields=[
                 ("id", models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name="ID")),
                 ("user_id", models.BigIntegerField(db_index=True)),
-                ("token", models.TextField(unique=True)),
+                ("token", models.CharField(max_length=255, unique=True)),
                 ("is_revoked", models.BooleanField(default=False)),
                 ("created_at", models.DateTimeField(auto_now_add=True)),
                 ("revoked_at", models.DateTimeField(blank=True, null=True)),
@@ -46,4 +46,3 @@ class Migration(migrations.Migration):
             ],
         ),
     ]
-

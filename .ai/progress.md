@@ -1,10 +1,10 @@
 # Progress
 
-Last updated: 2026-06-01
+Last updated: 2026-06-02
 
 ## Current milestone
 
-M8 - Frontend demo UI.
+M9 - Docker build and system flow verification.
 
 ## Completed
 
@@ -74,18 +74,32 @@ M8 - Frontend demo UI.
 - Added product detail UI view with detail fetch, VIEWED tracking, rating summary, reviews, related products, add-to-cart, and review form.
 - Added admin UI control to rebuild AI embeddings.
 - Added Gemini environment placeholders to local `.env` and `.env.example`.
+- Reworked Docker build setup around a shared multi-target backend Dockerfile.
+- Split backend Python dependencies into common, MySQL, Postgres, and AI requirement layers so sibling service images can reuse cache.
+- Switched backend runtime to `python:3.12-slim` without per-service apt installs.
+- Switched frontend Dockerfile to a Vite build stage plus `nginx:1.27-alpine` runtime.
+- Added `.dockerignore`, shared backend startup script, frontend nginx config, and database init scripts.
+- Added per-service database names and init scripts for MySQL/Postgres service databases.
+- Added hyphenated Docker network aliases and service URLs to avoid Django host validation issues from underscore service names.
+- Fixed MySQL compatibility for `RefreshToken.token` by using a bounded unique `CharField`.
+- Added `jti` to refresh JWT payloads to prevent duplicate token values when issuing multiple refresh tokens in the same second.
+- Verified Docker Compose config with `docker compose config --quiet`.
+- Verified full Docker build with shared dependency cache reuse.
+- Verified all containers start and remain up through `docker compose up -d --build`.
+- Verified backend health endpoints on ports 8000-8009 and frontend on port 3000.
+- Seeded 30 demo products from inside `product_service`.
+- Verified gateway end-to-end flow: register, login, profile, product list, add cart item, AI behavior tracking, checkout, payment success simulation, review creation, AI product sync, recommendations, and chat.
 
 ## In progress
 
 - Local commit for product detail UI and AI admin controls.
+- Local commit for Docker optimization and runtime verification changes.
 
 ## Next steps
 
-1. Commit product detail UI and AI admin controls locally.
-2. Run `docker compose up --build` when Docker permission is available.
-3. Run migrations and seed commands in containers.
-4. Test the customer/admin demo flow through the frontend.
-5. Ask for GitHub remote URL or GitHub CLI authorization before first push.
+1. Review and commit product detail UI, AI admin controls, Docker optimization, and runtime verification changes locally.
+2. Run a manual browser smoke test through the frontend at `http://localhost:3000`.
+3. Ask for GitHub remote URL or GitHub CLI authorization before first push.
 
 ## Open questions
 
