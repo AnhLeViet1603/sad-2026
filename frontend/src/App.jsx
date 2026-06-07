@@ -1,30 +1,25 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
+import { BrowserRouter, Link, NavLink, Route, Routes, useNavigate, useParams } from "react-router-dom";
 import axios from "axios";
 import "./styles.css";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 
-const viewLabels = {
-  shop: "Shop",
-  cart: "Cart",
-  checkout: "Checkout",
-  orders: "Orders",
-  ai: "Assistant",
-  admin: "Ops",
-};
-
 function App() {
+  return (
+    <BrowserRouter>
+      <StoreApp />
+    </BrowserRouter>
+  );
+}
+
+function StoreApp() {
   const [token, setToken] = useState(localStorage.getItem("access_token") || "");
-  const [view, setView] = useState("shop");
   const [products, setProducts] = useState([]);
   const [cart, setCart] = useState(null);
   const [orders, setOrders] = useState([]);
   const [recommendations, setRecommendations] = useState([]);
-  const [selectedProduct, setSelectedProduct] = useState(null);
-  const [productReviews, setProductReviews] = useState([]);
-  const [ratingSummary, setRatingSummary] = useState(null);
-  const [relatedProducts, setRelatedProducts] = useState([]);
   const [message, setMessage] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
 
@@ -39,19 +34,14 @@ function App() {
 
   const cartCount = (cart?.items || []).reduce((sum, item) => sum + Number(item.quantity || 0), 0);
   const categories = useMemo(() => {
-    const values = products.map((product) => product.category?.name || product.category).filter(Boolean);
-    return [...new Set(values)].slice(0, 8);
-  }, [products]);
-  const filteredProducts = useMemo(() => {
-    const keyword = searchTerm.trim().toLowerCase();
-    if (!keyword) return products;
-    return products.filter((product) => {
-      const category = product.category?.name || product.category || "";
-      return [product.name, product.description, product.brand, category].some((value) =>
-        String(value || "").toLowerCase().includes(keyword)
-      );
+    const byId = new Map();
+    products.forEach((product) => {
+      const category = normalizeCategory(product.category);
+      if (category) byId.set(category.id || category.slug || category.name, category);
     });
-  }, [products, searchTerm]);
+    return [...byId.values()].slice(0, 10);
+  }, [products]);
+  const filteredProducts = useMemo(() => filterProducts(products, searchTerm), [products, searchTerm]);
 
   async function loadProducts() {
     const response = await api.get("/api/products");
@@ -123,21 +113,260 @@ function App() {
     setMessage(`${product.name} was added to cart.`);
   }
 
-  async function openProductDetail(productId) {
-    const [productResponse, relatedResponse, reviewsResponse, summaryResponse] = await Promise.all([
-      api.get(`/api/products/${productId}`),
-      api.get(`/api/products/${productId}/related`).catch(() => ({ data: { data: [] } })),
-      api.get(`/api/comments/products/${productId}/reviews`).catch(() => ({ data: { data: [] } })),
-      api.get(`/api/comments/products/${productId}/summary`).catch(() => ({ data: { data: null } })),
-    ]);
-    setSelectedProduct(productResponse.data.data);
-    setRelatedProducts(relatedResponse.data.data || []);
-    setProductReviews(reviewsResponse.data.data || []);
-    setRatingSummary(summaryResponse.data.data);
-    setView("product-detail");
-    if (token) await api.post("/api/ai/track", { product_id: productId, event_type: "VIEWED" }).catch(() => {});
+  const common = {
+    api,
+    token,
+    products,
+    cart,
+    orders,
+    recommendations,
+    searchTerm,
+    categories,
+    filteredProducts,
+    setToken,
+    setMessage,
+    setSearchTerm,
+    showError,
+    requireAuth,
+    addToCart,
+    loadProducts,
+    loadCart,
+    loadOrders,
+    loadRecommendations,
+  };
+
+  return (
+    <main>
+      <Header
+        token={token}
+        cartCount={cartCount}
+        searchTerm={searchTerm}
+        setSearchTerm={setSearchTerm}
+        logout={logout}
+      />
+      {message && <div className="status">{message}</div>}
+      <Routes>
+        <Route path="/" element={<HomePage {...common} />} />
+        <Route path="/products" element={<ProductsPage {...common} />} />
+        <Route path="/products/:productId" element={<ProductDetailPage {...common} />} />
+        <Route path="/cart" element={<CartPage {...common} />} />
+        <Route path="/checkout" element={<CheckoutPage {...common} />} />
+        <Route path="/orders" element={<OrdersPage {...common} />} />
+        <Route path="/login" element={<AuthPage handleAuth={handleAuth} showError={showError} />} />
+        <Route path="/assistant" element={<AssistantPage {...common} />} />
+        <Route path="/admin" element={<AdminPage {...common} />} />
+        <Route path="*" element={<NotFoundPage />} />
+      </Routes>
+    </main>
+  );
+}
+
+function Header({ token, cartCount, searchTerm, setSearchTerm, logout }) {
+  return (
+    <header className="topbar">
+      <Link className="brand" to="/">
+        <span>MicroShop</span>
+        <small>Composable ecommerce demo</small>
+      </Link>
+      <label className="searchbar">
+        <span>Search</span>
+        <input
+          value={searchTerm}
+          onChange={(event) => setSearchTerm(event.target.value)}
+          placeholder="Search products, categories, brands"
+        />
+      </label>
+      <nav>
+        <NavLink to="/products">Products</NavLink>
+        <NavLink to="/cart">Cart{cartCount > 0 ? <b>{cartCount}</b> : null}</NavLink>
+        <NavLink to="/orders">Orders</NavLink>
+        <NavLink to="/assistant">Assistant</NavLink>
+        <NavLink to="/admin">Admin</NavLink>
+      </nav>
+      {token ? (
+        <button className="ghost" onClick={logout}>Logout</button>
+      ) : (
+        <Link className="button ghost" to="/login">Login</Link>
+      )}
+    </header>
+  );
+}
+
+function HomePage({ products, recommendations, categories, setSearchTerm, addToCart, showError }) {
+  const featured = recommendations.length ? recommendations : products.slice(0, 6);
+  return (
+    <>
+      <section className="hero">
+        <div>
+          <p className="eyebrow">Microservices commerce</p>
+          <h1>Shop a live product catalog powered by microservices.</h1>
+          <p>
+            Browse products, add items to cart, checkout, and let the recommendation graph learn from real customer
+            behavior.
+          </p>
+          <div className="hero-actions">
+            <Link className="button" to="/products">Shop products</Link>
+            <button className="secondary" onClick={() => setSearchTerm("smart")}>Explore smart picks</button>
+          </div>
+        </div>
+        <div className="hero-panel">
+          <span>Live catalog</span>
+          <strong>{products.length}</strong>
+          <small>products available through the API gateway</small>
+        </div>
+      </section>
+      <CategoryRow categories={categories} setSearchTerm={setSearchTerm} />
+      <ProductRail title="Recommended for you" products={featured} onAdd={addToCart} showError={showError} />
+    </>
+  );
+}
+
+function ProductsPage({ filteredProducts, products, categories, searchTerm, setSearchTerm, addToCart, showError }) {
+  return (
+    <>
+      <CategoryRow categories={categories} setSearchTerm={setSearchTerm} activeTerm={searchTerm} />
+      <section className="section-head">
+        <div>
+          <p className="eyebrow">Catalog</p>
+          <h2>{searchTerm ? `Results for "${searchTerm}"` : "All products"}</h2>
+        </div>
+        <span>{filteredProducts.length} of {products.length} items</span>
+      </section>
+      {filteredProducts.length ? (
+        <section className="catalog-grid">
+          {filteredProducts.map((product) => (
+            <ProductCard key={product.id} product={product} onAdd={addToCart} showError={showError} />
+          ))}
+        </section>
+      ) : (
+        <EmptyState title="No products found" body="Try clearing the category or search keyword." />
+      )}
+    </>
+  );
+}
+
+function ProductDetailPage({ api, token, addToCart, showError, requireAuth, setMessage }) {
+  const { productId } = useParams();
+  const [product, setProduct] = useState(null);
+  const [reviews, setReviews] = useState([]);
+  const [summary, setSummary] = useState(null);
+  const [related, setRelated] = useState([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      const [productResponse, relatedResponse, reviewsResponse, summaryResponse] = await Promise.all([
+        api.get(`/api/products/${productId}`),
+        api.get(`/api/products/${productId}/related`).catch(() => ({ data: { data: [] } })),
+        api.get(`/api/comments/products/${productId}/reviews`).catch(() => ({ data: { data: [] } })),
+        api.get(`/api/comments/products/${productId}/summary`).catch(() => ({ data: { data: null } })),
+      ]);
+      if (cancelled) return;
+      setProduct(productResponse.data.data);
+      setRelated(relatedResponse.data.data || []);
+      setReviews(reviewsResponse.data.data || []);
+      setSummary(summaryResponse.data.data);
+      if (token) await api.post("/api/ai/track", { product_id: Number(productId), event_type: "VIEWED" }).catch(() => {});
+    }
+    load().catch(showError);
+    return () => {
+      cancelled = true;
+    };
+  }, [api, productId, token]);
+
+  async function review(event) {
+    event.preventDefault();
+    if (!requireAuth() || !product) return;
+    const data = Object.fromEntries(new FormData(event.currentTarget));
+    await api.post("/api/comments/reviews", { ...data, product_id: product.id });
+    await api.post("/api/ai/track", { product_id: product.id, event_type: "RATED" }).catch(() => {});
+    setMessage("Review submitted.");
+    event.currentTarget.reset();
   }
 
+  if (!product) return <EmptyState title="Loading product" body="Fetching product details from Product Service." />;
+
+  return (
+    <>
+      <section className="product-detail">
+        <div className="detail-gallery">
+          <img src={productImage(product, "detail")} alt={product.name} />
+        </div>
+        <div className="detail-copy">
+          <p className="eyebrow">{categoryName(product.category)}</p>
+          <h1>{product.name}</h1>
+          <p>{product.description}</p>
+          <div className="detail-stats">
+            <span>{summary?.avg_rating || 0}/5 rating</span>
+            <span>{summary?.review_count || 0} reviews</span>
+            <span>{product.inventory?.available_quantity ?? 0} in stock</span>
+          </div>
+        </div>
+        <aside className="purchase-box">
+          <span>Price</span>
+          <strong>{formatPrice(product.price)}</strong>
+          <button onClick={() => addToCart(product).catch(showError)}>Add to cart</button>
+          <small>Checkout creates PURCHASED relationships in the recommendation graph.</small>
+        </aside>
+      </section>
+      <section className="content-grid">
+        <div className="panel">
+          <div className="section-head compact">
+            <h2>Customer reviews</h2>
+            <span>{reviews.length} shown</span>
+          </div>
+          {reviews.length ? reviews.map((item) => (
+            <div className="review" key={item.id}>
+              <strong>{item.rating}/5 {item.title}</strong>
+              <p>{item.content}</p>
+            </div>
+          )) : <p>No reviews yet.</p>}
+        </div>
+        <form className="panel review-form" onSubmit={(event) => review(event).catch(showError)}>
+          <h2>Write a review</h2>
+          <input name="rating" type="number" min="1" max="5" placeholder="Rating 1-5" required />
+          <input name="title" placeholder="Review title" />
+          <textarea name="content" placeholder="What should other shoppers know?" required />
+          <button type="submit">Submit review</button>
+        </form>
+      </section>
+      <ProductRail title="Related products" products={related} onAdd={addToCart} showError={showError} />
+    </>
+  );
+}
+
+function CartPage({ cart, loadCart, api, showError }) {
+  async function remove(id) {
+    await api.delete(`/api/cart/items/${id}`);
+    await loadCart();
+  }
+  const items = cart?.items || [];
+  return (
+    <section className="checkout-layout">
+      <div className="panel">
+        <div className="section-head compact">
+          <h2>Your cart</h2>
+          <span>{items.length} lines</span>
+        </div>
+        {items.length ? items.map((item) => (
+          <div className="cart-line" key={item.id}>
+            <img src={item.image_url || `https://picsum.photos/seed/cart-${item.product_id}/160/160`} alt={item.product_name} />
+            <div>
+              <strong>{item.product_name}</strong>
+              <span>Quantity {item.quantity}</span>
+            </div>
+            <strong>{formatPrice(item.line_total)}</strong>
+            <button className="ghost danger" onClick={() => remove(item.id).catch(showError)}>Remove</button>
+          </div>
+        )) : <p>Your cart is empty.</p>}
+      </div>
+      <OrderSummary cart={cart} action={<Link className="button" to="/checkout">Checkout</Link>} />
+    </section>
+  );
+}
+
+function CheckoutPage({ cart, api, requireAuth, loadCart, loadOrders, loadRecommendations, showError, setMessage }) {
+  const navigate = useNavigate();
   async function checkout(event) {
     event.preventDefault();
     if (!requireAuth()) return;
@@ -162,316 +391,12 @@ function App() {
     await loadCart();
     await loadOrders();
     await loadRecommendations().catch(() => {});
-    setView("orders");
-    setMessage(`Order #${order.id} created. Purchased events were sent to Neo4j.`);
+    setMessage(`Order #${order.id} created.`);
+    navigate("/orders");
   }
-
-  async function reviewFromDetail(event) {
-    event.preventDefault();
-    if (!requireAuth() || !selectedProduct) return;
-    const data = Object.fromEntries(new FormData(event.currentTarget));
-    await api.post("/api/comments/reviews", { ...data, product_id: selectedProduct.id });
-    await api.post("/api/ai/track", { product_id: selectedProduct.id, event_type: "RATED" }).catch(() => {});
-    await openProductDetail(selectedProduct.id);
-    setMessage("Review submitted.");
-  }
-
-  async function askBot(event) {
-    event.preventDefault();
-    const data = Object.fromEntries(new FormData(event.currentTarget));
-    const response = await api.post("/api/ai/chat", { message: data.message });
-    setMessage(response.data.data.answer);
-    setRecommendations(response.data.data.products);
-  }
-
-  return (
-    <main>
-      <header className="topbar">
-        <button className="brand" onClick={() => setView("shop")}>
-          <span>MicroShop</span>
-          <small>Book commerce demo</small>
-        </button>
-        <label className="searchbar">
-          <span>Search</span>
-          <input
-            value={searchTerm}
-            onChange={(event) => setSearchTerm(event.target.value)}
-            placeholder="Search books, categories, brands"
-          />
-        </label>
-        <nav>
-          {["shop", "cart", "checkout", "orders", "ai", "admin"].map((item) => (
-            <button className={view === item ? "active" : ""} key={item} onClick={() => setView(item)}>
-              {viewLabels[item]}
-              {item === "cart" && cartCount > 0 ? <b>{cartCount}</b> : null}
-            </button>
-          ))}
-        </nav>
-        {token ? (
-          <button className="ghost" onClick={logout}>Logout</button>
-        ) : (
-          <button className="ghost" onClick={() => setView("shop")}>Login</button>
-        )}
-      </header>
-
-      {message && <div className="status">{message}</div>}
-
-      {!token && <AuthPanel onSubmit={handleAuth} showError={showError} />}
-
-      {view === "shop" && (
-        <Shop
-          products={filteredProducts}
-          allProducts={products}
-          categories={categories}
-          recommendations={recommendations}
-          searchTerm={searchTerm}
-          setSearchTerm={setSearchTerm}
-          onAdd={addToCart}
-          onOpen={openProductDetail}
-          showError={showError}
-        />
-      )}
-      {view === "product-detail" && selectedProduct && (
-        <ProductDetail
-          product={selectedProduct}
-          reviews={productReviews}
-          summary={ratingSummary}
-          related={relatedProducts}
-          onAdd={addToCart}
-          onOpen={openProductDetail}
-          onReview={reviewFromDetail}
-          showError={showError}
-        />
-      )}
-      {view === "cart" && (
-        <Cart cart={cart} setView={setView} reload={loadCart} api={api} showError={showError} />
-      )}
-      {view === "checkout" && <Checkout cart={cart} onSubmit={checkout} showError={showError} />}
-      {view === "orders" && <Orders orders={orders} api={api} reload={loadOrders} showError={showError} />}
-      {view === "ai" && <AiPanel recommendations={recommendations} askBot={askBot} onOpen={openProductDetail} />}
-      {view === "admin" && (
-        <AdminPanel
-          api={api}
-          products={products}
-          reloadProducts={loadProducts}
-          reloadOrders={loadOrders}
-          reloadRecommendations={loadRecommendations}
-          showError={showError}
-        />
-      )}
-    </main>
-  );
-}
-
-function AuthPanel({ onSubmit, showError }) {
-  const [mode, setMode] = useState("login");
-  return (
-    <section className="auth-strip">
-      <div>
-        <strong>{mode === "login" ? "Welcome back" : "Create your demo account"}</strong>
-        <span>Use any email and password for the local demo.</span>
-      </div>
-      <div className="segment">
-        <button className={mode === "login" ? "active" : ""} onClick={() => setMode("login")}>Login</button>
-        <button className={mode === "register" ? "active" : ""} onClick={() => setMode("register")}>Register</button>
-      </div>
-      <form className="auth-form" onSubmit={(event) => onSubmit(mode, event).catch(showError)}>
-        <input name="email" type="email" placeholder="email@example.com" required />
-        <input name="password" type="password" placeholder="Password" required />
-        {mode === "register" && <input name="full_name" placeholder="Full name" required />}
-        <button type="submit">{mode === "login" ? "Login" : "Create account"}</button>
-      </form>
-    </section>
-  );
-}
-
-function Shop({ products, allProducts, categories, recommendations, searchTerm, setSearchTerm, onAdd, onOpen, showError }) {
-  const featured = recommendations.length ? recommendations : allProducts.slice(0, 6);
-  return (
-    <>
-      <section className="hero">
-        <div>
-          <p className="eyebrow">Microservices bookstore</p>
-          <h1>Find the next book your graph already knows you want.</h1>
-          <p>
-            Browse seeded products, add them to cart, checkout, and watch Neo4j learn from viewed, carted, rated, and
-            purchased behavior.
-          </p>
-          <div className="hero-actions">
-            <button onClick={() => document.querySelector(".catalog-grid")?.scrollIntoView({ behavior: "smooth" })}>
-              Shop catalog
-            </button>
-            <button className="secondary" onClick={() => setSearchTerm("AI")}>Explore AI books</button>
-          </div>
-        </div>
-        <div className="hero-panel">
-          <span>Live catalog</span>
-          <strong>{allProducts.length}</strong>
-          <small>products synced through the gateway</small>
-        </div>
-      </section>
-
-      <section className="category-row">
-        <button className={!searchTerm ? "active" : ""} onClick={() => setSearchTerm("")}>All</button>
-        {categories.map((category) => (
-          <button key={category} onClick={() => setSearchTerm(category)}>{category}</button>
-        ))}
-      </section>
-
-      <ProductRail title="Recommended for you" products={featured} onAdd={onAdd} onOpen={onOpen} showError={showError} />
-
-      <section className="section-head">
-        <div>
-          <p className="eyebrow">Catalog</p>
-          <h2>{searchTerm ? `Results for "${searchTerm}"` : "All products"}</h2>
-        </div>
-        <span>{products.length} items</span>
-      </section>
-      <section className="catalog-grid">
-        {products.map((product) => (
-          <ProductCard key={product.id} product={product} onAdd={onAdd} onOpen={onOpen} showError={showError} />
-        ))}
-      </section>
-    </>
-  );
-}
-
-function ProductRail({ title, products, onAdd, onOpen, showError }) {
-  if (!products.length) return null;
-  return (
-    <section className="rail">
-      <div className="section-head compact">
-        <h2>{title}</h2>
-        <span>{products.length} picks</span>
-      </div>
-      <div className="rail-scroll">
-        {products.slice(0, 8).map((product) => (
-          <ProductCard key={product.id} product={product} onAdd={onAdd} onOpen={onOpen} showError={showError} compact />
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function ProductCard({ product, onAdd, onOpen, showError, compact = false }) {
-  const category = product.category?.name || product.category || "Book";
-  return (
-    <article className={compact ? "product-card compact-card" : "product-card"}>
-      <button className="image-button" onClick={() => onOpen(product.id).catch(showError)}>
-        <img src={product.images?.[0]?.image_url || `https://picsum.photos/seed/book-${product.id}/520/640`} alt={product.name} />
-      </button>
-      <div className="product-body">
-        <div className="product-meta">
-          <span>{category}</span>
-          <span>{product.inventory?.available_quantity ?? product.stock ?? 0} left</span>
-        </div>
-        <h3>{product.name}</h3>
-        {!compact && <p>{product.description}</p>}
-        <div className="product-actions">
-          <strong>{formatPrice(product.price)}</strong>
-          <button onClick={() => onAdd(product).catch(showError)}>Add</button>
-        </div>
-      </div>
-    </article>
-  );
-}
-
-function ProductDetail({ product, reviews, summary, related, onAdd, onOpen, onReview, showError }) {
-  const category = product.category?.name || product.category || "Book";
-  return (
-    <>
-      <section className="product-detail">
-        <div className="detail-gallery">
-          <img src={product.images?.[0]?.image_url || `https://picsum.photos/seed/detail-${product.id}/900/720`} alt={product.name} />
-        </div>
-        <div className="detail-copy">
-          <p className="eyebrow">{category}</p>
-          <h1>{product.name}</h1>
-          <p>{product.description}</p>
-          <div className="detail-stats">
-            <span>{summary?.avg_rating || 0}/5 rating</span>
-            <span>{summary?.review_count || 0} reviews</span>
-            <span>{product.inventory?.available_quantity ?? 0} in stock</span>
-          </div>
-        </div>
-        <aside className="purchase-box">
-          <span>Price</span>
-          <strong>{formatPrice(product.price)}</strong>
-          <button onClick={() => onAdd(product).catch(showError)}>Add to cart</button>
-          <small>Checkout will create PURCHASED graph relationships for this product.</small>
-        </aside>
-      </section>
-
-      <section className="content-grid">
-        <div className="panel">
-          <div className="section-head compact">
-            <h2>Customer reviews</h2>
-            <span>{reviews.length} shown</span>
-          </div>
-          {reviews.length ? (
-            reviews.map((review) => (
-              <div className="review" key={review.id}>
-                <strong>{review.rating}/5 {review.title}</strong>
-                <p>{review.content}</p>
-              </div>
-            ))
-          ) : (
-            <p>No reviews yet.</p>
-          )}
-        </div>
-        <form className="panel review-form" onSubmit={(event) => onReview(event).catch(showError)}>
-          <h2>Write a review</h2>
-          <input name="rating" type="number" min="1" max="5" placeholder="Rating 1-5" required />
-          <input name="title" placeholder="Review title" />
-          <textarea name="content" placeholder="What should other shoppers know?" required />
-          <button type="submit">Submit review</button>
-        </form>
-      </section>
-
-      <ProductRail title="Related products" products={related} onAdd={onAdd} onOpen={onOpen} showError={showError} />
-    </>
-  );
-}
-
-function Cart({ cart, setView, reload, api, showError }) {
-  async function remove(id) {
-    await api.delete(`/api/cart/items/${id}`);
-    await reload();
-  }
-
-  const items = cart?.items || [];
   return (
     <section className="checkout-layout">
-      <div className="panel">
-        <div className="section-head compact">
-          <h2>Your cart</h2>
-          <span>{items.length} lines</span>
-        </div>
-        {items.length ? (
-          items.map((item) => (
-            <div className="cart-line" key={item.id}>
-              <img src={item.image_url || `https://picsum.photos/seed/cart-${item.product_id}/160/160`} alt={item.product_name} />
-              <div>
-                <strong>{item.product_name}</strong>
-                <span>Quantity {item.quantity}</span>
-              </div>
-              <strong>{formatPrice(item.line_total)}</strong>
-              <button className="ghost danger" onClick={() => remove(item.id).catch(showError)}>Remove</button>
-            </div>
-          ))
-        ) : (
-          <p>Your cart is empty.</p>
-        )}
-      </div>
-      <OrderSummary cart={cart} actionLabel="Checkout" onAction={() => setView("checkout")} disabled={!items.length} />
-    </section>
-  );
-}
-
-function Checkout({ cart, onSubmit, showError }) {
-  return (
-    <section className="checkout-layout">
-      <form className="panel checkout-form" onSubmit={(event) => onSubmit(event).catch(showError)}>
+      <form className="panel checkout-form" onSubmit={(event) => checkout(event).catch(showError)}>
         <div>
           <p className="eyebrow">Shipping</p>
           <h2>Delivery details</h2>
@@ -490,29 +415,15 @@ function Checkout({ cart, onSubmit, showError }) {
         </select>
         <button type="submit">Place order</button>
       </form>
-      <OrderSummary cart={cart} actionLabel="Place order" muted />
+      <OrderSummary cart={cart} />
     </section>
   );
 }
 
-function OrderSummary({ cart, actionLabel, onAction, disabled, muted = false }) {
-  const subtotal = Number(cart?.total_amount || 0);
-  const shipping = subtotal > 0 ? 30000 : 0;
-  return (
-    <aside className="summary-box">
-      <h2>Order summary</h2>
-      <div><span>Subtotal</span><strong>{formatPrice(subtotal)}</strong></div>
-      <div><span>Shipping</span><strong>{formatPrice(shipping)}</strong></div>
-      <div className="total"><span>Total</span><strong>{formatPrice(subtotal + shipping)}</strong></div>
-      {!muted && <button disabled={disabled} onClick={onAction}>{actionLabel}</button>}
-    </aside>
-  );
-}
-
-function Orders({ orders, api, reload, showError }) {
+function OrdersPage({ orders, api, loadOrders, showError }) {
   async function update(order, status) {
     await api.patch(`/api/orders/${order.id}/status`, { status });
-    await reload();
+    await loadOrders();
   }
   return (
     <section className="panel wide-panel">
@@ -520,47 +431,78 @@ function Orders({ orders, api, reload, showError }) {
         <h2>Orders</h2>
         <span>{orders.length} total</span>
       </div>
-      {orders.length ? (
-        orders.map((order) => (
-          <article className="order-row" key={order.id}>
-            <div>
-              <strong>Order #{order.id}</strong>
-              <span>{order.items?.length || 0} items · {formatPrice(order.total_amount)}</span>
-            </div>
-            <StatusBadge label={order.status} />
-            <StatusBadge label={order.payment_status} />
-            <span>{order.tracking_code || "No tracking yet"}</span>
-            <button onClick={() => update(order, "CONFIRMED").catch(showError)}>Confirm</button>
-          </article>
-        ))
-      ) : (
-        <p>No orders yet.</p>
-      )}
+      {orders.length ? orders.map((order) => (
+        <article className="order-row" key={order.id}>
+          <div>
+            <strong>Order #{order.id}</strong>
+            <span>{order.items?.length || 0} items · {formatPrice(order.total_amount)}</span>
+          </div>
+          <StatusBadge label={order.status} />
+          <StatusBadge label={order.payment_status} />
+          <span>{order.tracking_code || "No tracking yet"}</span>
+          <button onClick={() => update(order, "CONFIRMED").catch(showError)}>Confirm</button>
+        </article>
+      )) : <p>No orders yet.</p>}
     </section>
   );
 }
 
-function AiPanel({ recommendations, askBot, onOpen }) {
+function AuthPage({ handleAuth, showError }) {
+  const [mode, setMode] = useState("login");
+  const navigate = useNavigate();
+  async function submit(event) {
+    await handleAuth(mode, event);
+    navigate("/products");
+  }
+  return (
+    <section className="auth-page">
+      <div className="panel auth-panel">
+        <p className="eyebrow">Account</p>
+        <h1>{mode === "login" ? "Welcome back" : "Create your demo account"}</h1>
+        <p>Use any email and password for the local ecommerce demo.</p>
+        <div className="segment">
+          <button className={mode === "login" ? "active" : ""} onClick={() => setMode("login")}>Login</button>
+          <button className={mode === "register" ? "active" : ""} onClick={() => setMode("register")}>Register</button>
+        </div>
+        <form className="checkout-form" onSubmit={(event) => submit(event).catch(showError)}>
+          <input name="email" type="email" placeholder="email@example.com" required />
+          <input name="password" type="password" placeholder="Password" required />
+          {mode === "register" && <input name="full_name" placeholder="Full name" required />}
+          <button type="submit">{mode === "login" ? "Login" : "Create account"}</button>
+        </form>
+      </div>
+    </section>
+  );
+}
+
+function AssistantPage({ api, recommendations, showError }) {
+  const [answer, setAnswer] = useState("");
+  const [items, setItems] = useState(recommendations);
+  async function ask(event) {
+    event.preventDefault();
+    const data = Object.fromEntries(new FormData(event.currentTarget));
+    const response = await api.post("/api/ai/chat", { message: data.message });
+    setAnswer(response.data.data.answer);
+    setItems(response.data.data.products);
+  }
   return (
     <section className="assistant-layout">
-      <form className="assistant-box" onSubmit={askBot}>
+      <form className="assistant-box" onSubmit={(event) => ask(event).catch(showError)}>
         <p className="eyebrow">Shopping assistant</p>
         <h1>Ask for a recommendation</h1>
         <p>Responses use product documents, vector/keyword retrieval, and graph behavior when available.</p>
-        <textarea name="message" placeholder="Recommend books for learning AI and programming" required />
+        <textarea name="message" placeholder="Recommend products for my needs" required />
         <button type="submit">Ask assistant</button>
       </form>
       <div className="panel">
-        <div className="section-head compact">
-          <h2>Recommendation results</h2>
-          <span>{recommendations.length} products</span>
-        </div>
+        <h2>Recommendation results</h2>
+        {answer && <p>{answer}</p>}
         <div className="mini-list">
-          {recommendations.map((product) => (
-            <button key={product.id} onClick={() => onOpen(product.id)}>
+          {items.map((product) => (
+            <Link key={product.id} to={`/products/${product.id}`}>
               <strong>{product.name}</strong>
               <span>{formatPrice(product.price)} · {(product.sources || []).join(", ") || "popular"}</span>
-            </button>
+            </Link>
           ))}
         </div>
       </div>
@@ -568,11 +510,11 @@ function AiPanel({ recommendations, askBot, onOpen }) {
   );
 }
 
-function AdminPanel({ api, products, reloadProducts, reloadOrders, reloadRecommendations, showError }) {
+function AdminPage({ api, products, loadProducts, loadOrders, loadRecommendations, showError }) {
   async function syncProducts() {
     await api.post("/api/ai/sync-products");
-    await reloadProducts();
-    await reloadRecommendations();
+    await loadProducts();
+    await loadRecommendations();
   }
   async function rebuildEmbeddings() {
     await api.post("/api/ai/rebuild-embeddings");
@@ -585,11 +527,11 @@ function AdminPanel({ api, products, reloadProducts, reloadOrders, reloadRecomme
   return (
     <section className="ops-layout">
       <div className="panel">
-        <p className="eyebrow">Operations</p>
+        <p className="eyebrow">Admin tools</p>
         <h2>Demo controls</h2>
         <div className="ops-actions">
-          <button onClick={() => reloadProducts().catch(showError)}>Reload products</button>
-          <button onClick={() => reloadOrders().catch(showError)}>Reload orders</button>
+          <button onClick={() => loadProducts().catch(showError)}>Reload products</button>
+          <button onClick={() => loadOrders().catch(showError)}>Reload orders</button>
           <button onClick={() => syncProducts().catch(showError)}>Sync AI products</button>
           <button onClick={() => rebuildEmbeddings().catch(showError)}>Rebuild embeddings</button>
         </div>
@@ -605,8 +547,116 @@ function AdminPanel({ api, products, reloadProducts, reloadOrders, reloadRecomme
   );
 }
 
+function CategoryRow({ categories, setSearchTerm, activeTerm = "" }) {
+  return (
+    <section className="category-row">
+      <button className={!activeTerm ? "active" : ""} onClick={() => setSearchTerm("")}>All</button>
+      {categories.map((category) => (
+        <button
+          className={activeTerm === category.name ? "active" : ""}
+          key={category.id || category.slug || category.name}
+          onClick={() => setSearchTerm(category.name)}
+        >
+          {category.name}
+        </button>
+      ))}
+    </section>
+  );
+}
+
+function ProductRail({ title, products, onAdd, showError }) {
+  if (!products.length) return null;
+  return (
+    <section className="rail">
+      <div className="section-head compact">
+        <h2>{title}</h2>
+        <span>{products.length} picks</span>
+      </div>
+      <div className="rail-scroll">
+        {products.slice(0, 8).map((product) => (
+          <ProductCard key={product.id} product={product} onAdd={onAdd} showError={showError} compact />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function ProductCard({ product, onAdd, showError, compact = false }) {
+  return (
+    <article className={compact ? "product-card compact-card" : "product-card"}>
+      <Link className="image-button" to={`/products/${product.id}`}>
+        <img src={productImage(product)} alt={product.name} />
+      </Link>
+      <div className="product-body">
+        <div className="product-meta">
+          <span>{categoryName(product.category)}</span>
+          <span>{product.inventory?.available_quantity ?? product.stock ?? 0} left</span>
+        </div>
+        <h3><Link to={`/products/${product.id}`}>{product.name}</Link></h3>
+        {!compact && <p>{product.description}</p>}
+        <div className="product-actions">
+          <strong>{formatPrice(product.price)}</strong>
+          <button onClick={() => onAdd(product).catch(showError)}>Add</button>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function OrderSummary({ cart, action = null }) {
+  const subtotal = Number(cart?.total_amount || 0);
+  const shipping = subtotal > 0 ? 30000 : 0;
+  return (
+    <aside className="summary-box">
+      <h2>Order summary</h2>
+      <div><span>Subtotal</span><strong>{formatPrice(subtotal)}</strong></div>
+      <div><span>Shipping</span><strong>{formatPrice(shipping)}</strong></div>
+      <div className="total"><span>Total</span><strong>{formatPrice(subtotal + shipping)}</strong></div>
+      {action}
+    </aside>
+  );
+}
+
 function StatusBadge({ label }) {
   return <span className={`badge ${String(label || "").toLowerCase()}`}>{label || "UNKNOWN"}</span>;
+}
+
+function EmptyState({ title, body }) {
+  return (
+    <section className="empty-state">
+      <h2>{title}</h2>
+      <p>{body}</p>
+    </section>
+  );
+}
+
+function NotFoundPage() {
+  return <EmptyState title="Page not found" body="Use the navigation to return to the catalog." />;
+}
+
+function normalizeCategory(category) {
+  if (!category) return null;
+  if (typeof category === "object") return category;
+  return { id: String(category), name: String(category), slug: String(category) };
+}
+
+function categoryName(category) {
+  return normalizeCategory(category)?.name || "General";
+}
+
+function filterProducts(products, searchTerm) {
+  const keyword = String(searchTerm || "").trim().toLowerCase();
+  if (!keyword) return products;
+  return products.filter((product) => {
+    const category = categoryName(product.category);
+    return [product.name, product.description, product.brand, category].some((value) =>
+      String(value || "").toLowerCase().includes(keyword)
+    );
+  });
+}
+
+function productImage(product, seed = "product") {
+  return product.images?.[0]?.image_url || `https://picsum.photos/seed/${seed}-${product.id}/520/640`;
 }
 
 function formatPrice(value) {
