@@ -164,10 +164,10 @@ function StoreApp() {
         <Route path="/orders" element={<OrdersPage {...common} />} />
         <Route path="/account" element={<AccountPage {...common} />} />
         <Route path="/login" element={<AuthPage handleAuth={handleAuth} showError={showError} />} />
-        <Route path="/assistant" element={<AssistantPage {...common} />} />
         <Route path="/admin" element={<AdminPage {...common} />} />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
+      <FloatingAssistant api={api} showError={showError} />
     </main>
   );
 }
@@ -192,8 +192,6 @@ function Header({ token, cartCount, searchTerm, setSearchTerm, logout }) {
         <NavLink to="/cart">Cart{cartCount > 0 ? <b>{cartCount}</b> : null}</NavLink>
         <NavLink to="/orders">Orders</NavLink>
         <NavLink to="/account">Account</NavLink>
-        <NavLink to="/assistant">Assistant</NavLink>
-        <NavLink to="/admin">Admin</NavLink>
       </nav>
       {token ? (
         <button className="ghost" onClick={logout}>Logout</button>
@@ -585,38 +583,71 @@ function AccountPage({ token, addresses, api, loadAddresses, showError, setMessa
   );
 }
 
-function AssistantPage({ api, recommendations, showError }) {
+function FloatingAssistant({ api, showError }) {
+  const [open, setOpen] = useState(false);
+  const [messages, setMessages] = useState([
+    { role: "assistant", content: "Tell me what you need and I will suggest products from the catalog.", products: [] },
+  ]);
   const [answer, setAnswer] = useState("");
-  const [items, setItems] = useState(recommendations);
+  const [items, setItems] = useState([]);
   async function ask(event) {
     event.preventDefault();
     const data = Object.fromEntries(new FormData(event.currentTarget));
+    event.currentTarget.reset();
+    setMessages((current) => [...current, { role: "user", content: data.message, products: [] }]);
     const response = await api.post("/api/ai/chat", { message: data.message });
-    setAnswer(response.data.data.answer);
-    setItems(response.data.data.products);
+    const payload = response.data.data;
+    setAnswer(payload.answer);
+    setItems(payload.products);
+    setMessages((current) => [...current, { role: "assistant", content: payload.answer, products: payload.products }]);
   }
   return (
-    <section className="assistant-layout">
-      <form className="assistant-box" onSubmit={(event) => ask(event).catch(showError)}>
-        <p className="eyebrow">Shopping assistant</p>
-        <h1>Ask for a recommendation</h1>
-        <p>Responses use product documents, vector/keyword retrieval, and graph behavior when available.</p>
-        <textarea name="message" placeholder="Recommend products for my needs" required />
-        <button type="submit">Ask assistant</button>
-      </form>
-      <div className="panel">
-        <h2>Recommendation results</h2>
-        {answer && <p>{answer}</p>}
-        <div className="mini-list">
-          {items.map((product) => (
-            <Link key={product.id} to={`/products/${product.id}`}>
-              <strong>{product.name}</strong>
-              <span>{formatPrice(product.price)} · {(product.sources || []).join(", ") || "popular"}</span>
-            </Link>
-          ))}
-        </div>
-      </div>
-    </section>
+    <div className="chat-widget">
+      {open && (
+        <section className="chat-panel">
+          <div className="chat-head">
+            <div>
+              <strong>Shopping assistant</strong>
+              <span>AI recommendations</span>
+            </div>
+            <button className="ghost" onClick={() => setOpen(false)}>Close</button>
+          </div>
+          <div className="chat-log">
+            {messages.map((message, index) => (
+              <div className={`chat-message ${message.role}`} key={`${message.role}-${index}`}>
+                <p>{message.content}</p>
+                {!!message.products?.length && (
+                  <div className="chat-products">
+                    {message.products.slice(0, 3).map((product) => (
+                      <Link key={product.id} to={`/products/${product.id}`} onClick={() => setOpen(false)}>
+                        {product.name}
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+          <form className="chat-form" onSubmit={(event) => ask(event).catch(showError)}>
+            <input name="message" placeholder="Ask for product suggestions" required />
+            <button type="submit">Send</button>
+          </form>
+          {answer && (
+            <div className="chat-suggestions">
+              {items.slice(0, 3).map((product) => (
+                <Link key={product.id} to={`/products/${product.id}`} onClick={() => setOpen(false)}>
+                  <strong>{product.name}</strong>
+                  <span>{formatPrice(product.price)}</span>
+                </Link>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+      <button className="chat-launcher" onClick={() => setOpen((value) => !value)}>
+        {open ? "Hide chat" : "Chat"}
+      </button>
+    </div>
   );
 }
 

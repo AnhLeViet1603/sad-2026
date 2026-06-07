@@ -654,6 +654,92 @@ nav a b {
   text-decoration: none;
 }
 
+.chat-widget {
+  bottom: 22px;
+  display: grid;
+  gap: 12px;
+  justify-items: end;
+  position: fixed;
+  right: 22px;
+  z-index: 40;
+}
+
+.chat-launcher {
+  border-radius: 999px;
+  box-shadow: 0 14px 34px rgba(17, 24, 39, 0.22);
+  min-width: 92px;
+}
+
+.chat-panel {
+  background: #ffffff;
+  border: 1px solid #e2ded6;
+  border-radius: 8px;
+  box-shadow: 0 22px 60px rgba(17, 24, 39, 0.2);
+  display: grid;
+  gap: 12px;
+  max-height: min(620px, calc(100vh - 110px));
+  overflow: hidden;
+  padding: 14px;
+  width: min(380px, calc(100vw - 32px));
+}
+
+.chat-head {
+  align-items: center;
+  border-bottom: 1px solid #ece8df;
+  display: flex;
+  justify-content: space-between;
+  padding-bottom: 10px;
+}
+
+.chat-head div,
+.chat-message,
+.chat-suggestions a {
+  display: grid;
+  gap: 3px;
+}
+
+.chat-log {
+  display: grid;
+  gap: 10px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.chat-message {
+  background: #f8f6f2;
+  border-radius: 8px;
+  justify-self: start;
+  max-width: 90%;
+  padding: 10px;
+}
+
+.chat-message.user {
+  background: #dcfce7;
+  justify-self: end;
+}
+
+.chat-products,
+.chat-suggestions {
+  display: grid;
+  gap: 8px;
+}
+
+.chat-products a,
+.chat-suggestions a {
+  background: #ffffff;
+  border: 1px solid #e2ded6;
+  border-radius: 6px;
+  color: #20242a;
+  padding: 8px;
+  text-decoration: none;
+}
+
+.chat-form {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 1fr auto;
+}
+
 .auth-page {
   display: grid;
   justify-items: center;
