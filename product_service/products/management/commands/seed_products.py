@@ -7,82 +7,95 @@ from products.models import Category, Inventory, Product, ProductAttribute, Prod
 
 
 CATEGORIES = [
-    "Sách lập trình",
-    "Sách AI/Data",
-    "Sách kinh tế",
-    "Sách ngoại ngữ",
-    "Sách kỹ năng",
-    "Sách thiếu nhi",
+    "Electronics",
+    "Home & Kitchen",
+    "Fashion",
+    "Beauty & Health",
+    "Sports & Outdoor",
+    "Toys & Games",
 ]
 
-PRODUCT_NAMES = [
-    "Python thực chiến",
-    "Django REST Framework căn bản",
-    "Clean Code cho lập trình viên",
-    "Kiến trúc Microservices",
-    "Docker và Kubernetes nhập môn",
-    "Machine Learning cơ bản",
-    "Deep Learning ứng dụng",
-    "Data Engineering với Python",
-    "SQL cho phân tích dữ liệu",
-    "Trí tuệ nhân tạo trong kinh doanh",
-    "Tư duy tài chính cá nhân",
-    "Marketing hiện đại",
-    "Khởi nghiệp tinh gọn",
-    "Quản trị sản phẩm số",
-    "Kế toán cho nhà quản lý",
-    "English Grammar in Use",
-    "IELTS Vocabulary Builder",
-    "Giao tiếp tiếng Anh công sở",
-    "Tiếng Nhật nhập môn",
-    "TOEIC chiến lược 750+",
-    "Kỹ năng giao tiếp",
-    "Tư duy phản biện",
-    "Quản lý thời gian",
-    "Làm việc sâu",
-    "Thói quen hiệu quả",
-    "Toán vui cho trẻ",
-    "Khoa học quanh em",
-    "Truyện kể trước giờ ngủ",
-    "Khám phá thế giới động vật",
-    "Lập trình Scratch cho thiếu nhi",
+PRODUCTS = [
+    ("Electronics", "Noise Canceling Headphones", "A wireless headset for focused work, travel, and daily calls.", "SoundWave"),
+    ("Electronics", "Smart Fitness Watch", "Tracks workouts, sleep, heart rate, and daily productivity reminders.", "PulsePro"),
+    ("Electronics", "Portable Bluetooth Speaker", "Compact speaker with clear sound for home, office, and outdoor use.", "SoundWave"),
+    ("Electronics", "USB-C Fast Charging Hub", "Multi-port charging hub for phones, tablets, laptops, and accessories.", "Voltix"),
+    ("Electronics", "4K Action Camera", "Durable action camera for travel, sports, and content creation.", "Camora"),
+    ("Home & Kitchen", "Air Fryer Oven", "Countertop air fryer for quick meals with less oil.", "HomeChef"),
+    ("Home & Kitchen", "Robot Vacuum Cleaner", "Smart vacuum for scheduled cleaning across multiple rooms.", "CleanMate"),
+    ("Home & Kitchen", "Ceramic Cookware Set", "Non-stick cookware set for everyday cooking.", "KitchenPro"),
+    ("Home & Kitchen", "Ergonomic Office Chair", "Adjustable chair for long work sessions and home offices.", "WorkWell"),
+    ("Home & Kitchen", "LED Desk Lamp", "Dimmable desk lamp with warm and cool light modes.", "Brightly"),
+    ("Fashion", "Everyday Canvas Backpack", "Lightweight backpack with laptop storage and travel pockets.", "UrbanTrail"),
+    ("Fashion", "Classic White Sneakers", "Comfortable sneakers for casual outfits and daily walks.", "StreetForm"),
+    ("Fashion", "Water Resistant Jacket", "Light jacket for commute, travel, and changing weather.", "UrbanTrail"),
+    ("Fashion", "Leather Card Wallet", "Slim wallet with quick-access slots for cards and cash.", "NomadGoods"),
+    ("Fashion", "Cotton Graphic T-Shirt", "Soft cotton tee designed for everyday wear.", "StreetForm"),
+    ("Beauty & Health", "Hydrating Skincare Set", "Daily skincare set with cleanser, serum, and moisturizer.", "GlowLab"),
+    ("Beauty & Health", "Electric Toothbrush", "Rechargeable toothbrush with multiple cleaning modes.", "SmileCare"),
+    ("Beauty & Health", "Aromatherapy Diffuser", "Quiet diffuser for essential oils and room ambience.", "CalmSpace"),
+    ("Beauty & Health", "Digital Body Scale", "Smart scale for tracking weight and body metrics.", "PulsePro"),
+    ("Beauty & Health", "Massage Therapy Gun", "Portable massage device for recovery and muscle relaxation.", "FlexFit"),
+    ("Sports & Outdoor", "Adjustable Dumbbell Pair", "Space-saving dumbbells for home strength training.", "FlexFit"),
+    ("Sports & Outdoor", "Yoga Mat Pro", "Non-slip mat for yoga, stretching, and floor workouts.", "ZenMove"),
+    ("Sports & Outdoor", "Insulated Water Bottle", "Keeps drinks cold or warm during workouts and travel.", "TrailCup"),
+    ("Sports & Outdoor", "Camping Lantern", "Rechargeable lantern for camping, emergencies, and outdoor nights.", "CampLite"),
+    ("Sports & Outdoor", "Running Waist Pack", "Compact waist pack for phone, keys, and running essentials.", "Runly"),
+    ("Toys & Games", "STEM Building Blocks", "Creative construction set for hands-on learning and play.", "BrightKids"),
+    ("Toys & Games", "Family Strategy Board Game", "Easy-to-learn strategy game for family game nights.", "TableFun"),
+    ("Toys & Games", "Remote Control Car", "Rechargeable RC car for indoor and outdoor racing.", "RacerBox"),
+    ("Toys & Games", "Kids Art Supply Kit", "Drawing and craft kit with markers, paper, and accessories.", "BrightKids"),
+    ("Toys & Games", "Puzzle Adventure Set", "Colorful puzzle set for focus, memory, and problem solving.", "TableFun"),
 ]
 
 
 class Command(BaseCommand):
-    help = "Seed demo bookstore products."
+    help = "Seed demo ecommerce products."
 
     def handle(self, *args, **options):
+        Product.objects.filter(brand__in=["Ecom Books", "MicroShop Demo"]).delete()
+
         categories = {
             name: Category.objects.get_or_create(name=name, slug=slugify(name))[0]
             for name in CATEGORIES
         }
-        publisher_attr, _ = ProductAttribute.objects.get_or_create(code="publisher", defaults={"name": "Nhà xuất bản"})
-        level_attr, _ = ProductAttribute.objects.get_or_create(code="level", defaults={"name": "Mức độ"})
+        brand_attr, _ = ProductAttribute.objects.get_or_create(code="brand", defaults={"name": "Brand"})
+        warranty_attr, _ = ProductAttribute.objects.get_or_create(code="warranty", defaults={"name": "Warranty"})
 
-        for index, name in enumerate(PRODUCT_NAMES, start=1):
-            category = categories[CATEGORIES[(index - 1) // 5]]
-            product, created = Product.objects.get_or_create(
+        for index, (category_name, name, description, brand) in enumerate(PRODUCTS, start=1):
+            category = categories[category_name]
+            product, _ = Product.objects.update_or_create(
                 slug=slugify(name),
                 defaults={
                     "name": name,
-                    "description": f"{name} là sách demo phục vụ luồng e-commerce và AI recommendation.",
-                    "price": Decimal("99000") + Decimal(index * 7000),
+                    "description": description,
+                    "price": Decimal("149000") + Decimal(index * 85000),
                     "category": category,
-                    "brand": "Ecom Books",
+                    "brand": "MicroShop Demo",
                     "status": "ACTIVE",
                 },
             )
-            if created:
-                Inventory.objects.create(product=product, quantity=20 + index, reserved_quantity=0)
-                ProductImage.objects.create(
-                    product=product,
-                    image_url=f"https://picsum.photos/seed/book-{index}/480/640",
-                    alt_text=name,
-                    is_primary=True,
-                )
-                ProductAttributeValue.objects.create(product=product, attribute=publisher_attr, value="Ecom Publishing")
-                ProductAttributeValue.objects.create(product=product, attribute=level_attr, value="Cơ bản")
+            Inventory.objects.update_or_create(
+                product=product,
+                defaults={"quantity": 18 + index, "reserved_quantity": 0},
+            )
+            ProductImage.objects.update_or_create(
+                product=product,
+                is_primary=True,
+                defaults={
+                    "image_url": f"https://picsum.photos/seed/ecom-{index}/640/640",
+                    "alt_text": name,
+                },
+            )
+            ProductAttributeValue.objects.update_or_create(
+                product=product,
+                attribute=brand_attr,
+                defaults={"value": brand},
+            )
+            ProductAttributeValue.objects.update_or_create(
+                product=product,
+                attribute=warranty_attr,
+                defaults={"value": "12 months"},
+            )
 
-        self.stdout.write(self.style.SUCCESS("Seeded 30 demo products."))
-
+        self.stdout.write(self.style.SUCCESS("Seeded 30 demo ecommerce products."))
