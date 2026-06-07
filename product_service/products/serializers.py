@@ -44,6 +44,14 @@ class ProductAttributeValueSerializer(serializers.ModelSerializer):
 
 
 class ProductSerializer(serializers.ModelSerializer):
+    category = CategorySerializer(read_only=True)
+    category_id = serializers.PrimaryKeyRelatedField(
+        queryset=Category.objects.all(),
+        source="category",
+        write_only=True,
+        required=False,
+        allow_null=True,
+    )
     images = ProductImageSerializer(many=True, required=False)
     inventory = InventorySerializer(required=False)
     attribute_values = ProductAttributeValueSerializer(many=True, required=False)
@@ -57,6 +65,7 @@ class ProductSerializer(serializers.ModelSerializer):
             "description",
             "price",
             "category",
+            "category_id",
             "brand",
             "status",
             "created_at",
@@ -88,4 +97,3 @@ class ProductSerializer(serializers.ModelSerializer):
             Inventory.objects.update_or_create(product=instance, defaults=inventory)
 
         return instance
-
