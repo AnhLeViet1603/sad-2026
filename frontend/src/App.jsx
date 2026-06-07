@@ -19,6 +19,7 @@ function StoreApp() {
   const [products, setProducts] = useState([]);
   const [cart, setCart] = useState(null);
   const [orders, setOrders] = useState([]);
+  const [addresses, setAddresses] = useState([]);
   const [recommendations, setRecommendations] = useState([]);
   const [message, setMessage] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
@@ -60,6 +61,12 @@ function StoreApp() {
     setOrders(response.data.data);
   }
 
+  async function loadAddresses() {
+    if (!token) return;
+    const response = await api.get("/api/users/addresses");
+    setAddresses(response.data.data);
+  }
+
   async function loadRecommendations() {
     const response = await api.get("/api/ai/recommendations/home");
     setRecommendations(response.data.data.products || []);
@@ -73,6 +80,7 @@ function StoreApp() {
   useEffect(() => {
     loadCart().catch(() => {});
     loadOrders().catch(() => {});
+    loadAddresses().catch(() => {});
   }, [token]);
 
   function showError(error) {
@@ -119,6 +127,7 @@ function StoreApp() {
     products,
     cart,
     orders,
+    addresses,
     recommendations,
     searchTerm,
     categories,
@@ -132,6 +141,7 @@ function StoreApp() {
     loadProducts,
     loadCart,
     loadOrders,
+    loadAddresses,
     loadRecommendations,
   };
 
@@ -152,6 +162,7 @@ function StoreApp() {
         <Route path="/cart" element={<CartPage {...common} />} />
         <Route path="/checkout" element={<CheckoutPage {...common} />} />
         <Route path="/orders" element={<OrdersPage {...common} />} />
+        <Route path="/account" element={<AccountPage {...common} />} />
         <Route path="/login" element={<AuthPage handleAuth={handleAuth} showError={showError} />} />
         <Route path="/assistant" element={<AssistantPage {...common} />} />
         <Route path="/admin" element={<AdminPage {...common} />} />
@@ -180,6 +191,7 @@ function Header({ token, cartCount, searchTerm, setSearchTerm, logout }) {
         <NavLink to="/products">Products</NavLink>
         <NavLink to="/cart">Cart{cartCount > 0 ? <b>{cartCount}</b> : null}</NavLink>
         <NavLink to="/orders">Orders</NavLink>
+        <NavLink to="/account">Account</NavLink>
         <NavLink to="/assistant">Assistant</NavLink>
         <NavLink to="/admin">Admin</NavLink>
       </nav>
@@ -365,21 +377,34 @@ function CartPage({ cart, loadCart, api, showError }) {
   );
 }
 
-function CheckoutPage({ cart, api, requireAuth, loadCart, loadOrders, loadRecommendations, showError, setMessage }) {
+function CheckoutPage({ cart, addresses, api, requireAuth, loadCart, loadOrders, loadRecommendations, showError, setMessage }) {
   const navigate = useNavigate();
+  const [selectedAddressId, setSelectedAddressId] = useState("");
+  const defaultAddress = addresses.find((address) => address.is_default) || addresses[0];
+
+  useEffect(() => {
+    if (!selectedAddressId && defaultAddress) setSelectedAddressId(String(defaultAddress.id));
+  }, [defaultAddress, selectedAddressId]);
+
   async function checkout(event) {
     event.preventDefault();
     if (!requireAuth()) return;
     const data = Object.fromEntries(new FormData(event.currentTarget));
+    const address = addresses.find((item) => String(item.id) === String(data.address_id));
+    if (!address) {
+      setMessage("Please add a delivery address before checkout.");
+      navigate("/account");
+      return;
+    }
     const response = await api.post("/api/orders/checkout", {
       payment_method: data.payment_method,
       shipping_address: {
-        receiver_name: data.receiver_name,
-        phone: data.phone,
-        province: data.province,
-        district: data.district,
-        ward: data.ward,
-        detail: data.detail,
+        receiver_name: address.receiver_name,
+        phone: address.phone,
+        province: address.province,
+        district: address.district,
+        ward: address.ward,
+        detail: address.detail,
       },
     });
     const order = response.data.data;
@@ -394,21 +419,34 @@ function CheckoutPage({ cart, api, requireAuth, loadCart, loadOrders, loadRecomm
     setMessage(`Order #${order.id} created.`);
     navigate("/orders");
   }
+  if (!addresses.length) {
+    return (
+      <section className="checkout-layout">
+        <div className="panel">
+          <p className="eyebrow">Delivery</p>
+          <h2>No saved address yet</h2>
+          <p>Add a delivery address to your account, then return to checkout.</p>
+          <Link className="button" to="/account">Add delivery address</Link>
+        </div>
+        <OrderSummary cart={cart} />
+      </section>
+    );
+  }
   return (
     <section className="checkout-layout">
       <form className="panel checkout-form" onSubmit={(event) => checkout(event).catch(showError)}>
         <div>
           <p className="eyebrow">Shipping</p>
-          <h2>Delivery details</h2>
+          <h2>Choose delivery address</h2>
         </div>
-        <input name="receiver_name" placeholder="Receiver name" required />
-        <input name="phone" placeholder="Phone" required />
-        <div className="form-two">
-          <input name="province" placeholder="Province" required />
-          <input name="district" placeholder="District" required />
-        </div>
-        <input name="ward" placeholder="Ward" required />
-        <textarea name="detail" placeholder="Address detail" required />
+        <select name="address_id" value={selectedAddressId} onChange={(event) => setSelectedAddressId(event.target.value)} required>
+          {addresses.map((address) => (
+            <option key={address.id} value={address.id}>
+              {address.receiver_name} - {address.phone} - {address.detail}, {address.ward}, {address.district}, {address.province}
+            </option>
+          ))}
+        </select>
+        <Link className="button ghost" to="/account">Manage addresses</Link>
         <select name="payment_method" defaultValue="COD">
           <option value="COD">Cash on delivery demo</option>
           <option value="BANK_TRANSFER">Bank transfer demo</option>
@@ -471,6 +509,78 @@ function AuthPage({ handleAuth, showError }) {
           <button type="submit">{mode === "login" ? "Login" : "Create account"}</button>
         </form>
       </div>
+    </section>
+  );
+}
+
+function AccountPage({ token, addresses, api, loadAddresses, showError, setMessage }) {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!token) navigate("/login");
+  }, [token, navigate]);
+
+  async function saveAddress(event) {
+    event.preventDefault();
+    const data = Object.fromEntries(new FormData(event.currentTarget));
+    await api.post("/api/users/addresses", {
+      ...data,
+      is_default: data.is_default === "on",
+    });
+    event.currentTarget.reset();
+    await loadAddresses();
+    setMessage("Delivery address saved.");
+  }
+
+  async function makeDefault(address) {
+    await api.patch(`/api/users/addresses/${address.id}`, { is_default: true });
+    await loadAddresses();
+    setMessage("Default address updated.");
+  }
+
+  async function removeAddress(address) {
+    await api.delete(`/api/users/addresses/${address.id}`);
+    await loadAddresses();
+    setMessage("Address removed.");
+  }
+
+  return (
+    <section className="account-layout">
+      <div className="panel">
+        <p className="eyebrow">Profile</p>
+        <h2>Saved delivery addresses</h2>
+        {addresses.length ? addresses.map((address) => (
+          <article className="address-card" key={address.id}>
+            <div>
+              <strong>{address.receiver_name}</strong>
+              <span>{address.phone}</span>
+              <p>{address.detail}, {address.ward}, {address.district}, {address.province}</p>
+              {address.is_default && <StatusBadge label="DEFAULT" />}
+            </div>
+            <div className="address-actions">
+              {!address.is_default && <button onClick={() => makeDefault(address).catch(showError)}>Set default</button>}
+              <button className="ghost danger" onClick={() => removeAddress(address).catch(showError)}>Delete</button>
+            </div>
+          </article>
+        )) : <p>No saved address yet.</p>}
+      </div>
+      <form className="panel checkout-form" onSubmit={(event) => saveAddress(event).catch(showError)}>
+        <p className="eyebrow">Delivery</p>
+        <h2>Add address</h2>
+        <input name="receiver_name" placeholder="Receiver name" required />
+        <input name="phone" placeholder="Phone" required />
+        <div className="form-two">
+          <input name="province" placeholder="Province" required />
+          <input name="district" placeholder="District" required />
+        </div>
+        <input name="ward" placeholder="Ward" required />
+        <textarea name="detail" placeholder="Address detail" required />
+        <label className="check-row">
+          <input name="is_default" type="checkbox" />
+          <span>Use as default delivery address</span>
+        </label>
+        <button type="submit">Save address</button>
+      </form>
     </section>
   );
 }

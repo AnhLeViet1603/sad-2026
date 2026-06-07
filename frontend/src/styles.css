@@ -496,6 +496,7 @@ nav a b {
 
 .content-grid,
 .checkout-layout,
+.account-layout,
 .assistant-layout,
 .ops-layout {
   display: grid;
@@ -578,6 +579,38 @@ nav a b {
   grid-template-columns: minmax(220px, 1fr) auto auto minmax(160px, 0.7fr) auto;
 }
 
+.address-card {
+  align-items: center;
+  border-top: 1px solid #ece8df;
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: 14px 0;
+}
+
+.address-card div:first-child {
+  display: grid;
+  gap: 4px;
+}
+
+.address-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.check-row {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+}
+
+.check-row input {
+  min-height: 0;
+  width: auto;
+}
+
 .badge.success,
 .badge.completed,
 .badge.confirmed {
@@ -658,6 +691,7 @@ nav a b {
   .product-detail,
   .content-grid,
   .checkout-layout,
+  .account-layout,
   .assistant-layout,
   .ops-layout {
     grid-template-columns: 1fr;
@@ -680,6 +714,7 @@ nav a b {
   .product-detail,
   .content-grid,
   .checkout-layout,
+  .account-layout,
   .assistant-layout,
   .ops-layout,
   .wide-panel {
@@ -698,7 +733,8 @@ nav a b {
   .auth-form,
   .form-two,
   .cart-line,
-  .order-row {
+  .order-row,
+  .address-card {
     grid-template-columns: 1fr;
   }
 
