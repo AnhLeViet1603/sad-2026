@@ -88,7 +88,7 @@ def home_recommendations(request):
 def search(request):
     query = request.query_params.get("q", "")
     results = hybrid_search(query, user_id=request.user_id, limit=8)
-    payload = [product_payload(item["product"], item["sources"]) for item in results]
+    payload = [product_payload(item["product"], item["sources"], item.get("score")) for item in results]
     RecommendationLog.objects.create(
         user_id=request.user_id,
         query=query,
@@ -113,7 +113,7 @@ def chat(request):
     ChatMessage.objects.create(session=session, role="user", content=message)
 
     results = hybrid_search(message, user_id=request.user_id, limit=5)
-    products = [product_payload(item["product"], item["sources"]) for item in results]
+    products = [product_payload(item["product"], item["sources"], item.get("score")) for item in results]
     answer = generate_answer(message, products)
 
     ChatMessage.objects.create(session=session, role="assistant", content=answer, products=products)
@@ -131,4 +131,3 @@ def chat(request):
             "retrieval": [{"product_id": product["id"], "sources": product["sources"]} for product in products],
         }
     )
-

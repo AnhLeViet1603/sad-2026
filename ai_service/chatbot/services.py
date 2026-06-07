@@ -4,7 +4,6 @@ import os
 from decimal import Decimal
 
 import requests
-from django.db.models import Q
 from neo4j import GraphDatabase
 from pgvector.django import CosineDistance
 
@@ -12,6 +11,35 @@ from chatbot.models import ProductDocument
 
 
 VECTOR_DIMENSIONS = 3072
+SOURCE_LABELS = {
+    "keyword": "matched your keywords",
+    "vector": "semantically close to your question",
+    "personalized": "related to your previous activity",
+}
+STOPWORDS = {
+    "a",
+    "an",
+    "and",
+    "for",
+    "i",
+    "me",
+    "my",
+    "need",
+    "product",
+    "products",
+    "the",
+    "to",
+    "want",
+}
+QUERY_EXPANSIONS = {
+    "clean": ["cleaning", "vacuum", "cleaner"],
+    "cleaning": ["clean", "vacuum", "cleaner"],
+    "workout": ["fitness", "training", "dumbbell", "yoga", "sports"],
+    "exercise": ["fitness", "training", "dumbbell", "yoga", "sports"],
+    "sport": ["sports", "fitness", "training"],
+    "sports": ["sport", "fitness", "training"],
+    "kitchen": ["cookware", "fryer", "cooking"],
+}
 
 
 class GeminiError(Exception):
@@ -39,6 +67,7 @@ def sync_products_from_service():
         raise RuntimeError("Product export failed")
 
     count = 0
+    synced_ids = []
     for item in payload["data"]:
         document = build_document(item)
         product, _ = ProductDocument.objects.update_or_create(
@@ -54,7 +83,11 @@ def sync_products_from_service():
             },
         )
         upsert_product_node(product)
+        synced_ids.append(product.product_id)
         count += 1
+    if synced_ids:
+        ProductDocument.objects.exclude(product_id__in=synced_ids).delete()
+        delete_stale_product_nodes(synced_ids)
     return count
 
 
@@ -114,14 +147,39 @@ def normalize_dimensions(values):
 
 
 def keyword_search(query, limit=8):
-    queryset = ProductDocument.objects.all()
-    words = [word for word in query.split() if len(word) > 1]
-    if words:
-        condition = Q()
-        for word in words[:8]:
-            condition |= Q(name__icontains=word) | Q(description__icontains=word) | Q(category__icontains=word)
-        queryset = queryset.filter(condition)
-    return list(queryset.order_by("price")[:limit])
+    terms = query_terms(query)
+    if not terms:
+        return list(ProductDocument.objects.order_by("price")[:limit])
+
+    scored = []
+    for product in ProductDocument.objects.all():
+        haystack = " ".join(
+            [
+                product.name or "",
+                product.description or "",
+                product.category or "",
+                product.brand or "",
+            ]
+        ).lower()
+        score = 0
+        for term in terms:
+            if term in haystack:
+                score += 2 if term in (product.name or "").lower() else 1
+        if score:
+            scored.append((score, product))
+    scored.sort(key=lambda item: (-item[0], item[1].price))
+    return [product for _, product in scored[:limit]]
+
+
+def query_terms(query):
+    terms = []
+    for raw in query.lower().replace(",", " ").replace(".", " ").split():
+        term = "".join(character for character in raw if character.isalnum())
+        if len(term) <= 1 or term in STOPWORDS:
+            continue
+        terms.append(term)
+        terms.extend(QUERY_EXPANSIONS.get(term, []))
+    return list(dict.fromkeys(terms))[:12]
 
 
 def vector_search(query, limit=8):
@@ -138,32 +196,46 @@ def hybrid_search(query, user_id=None, limit=8):
 
     for rank, product in enumerate(keyword_search(query, limit=limit), start=1):
         scored.setdefault(product.product_id, {"product": product, "score": 0, "sources": set()})
-        scored[product.product_id]["score"] += 1 / rank
+        scored[product.product_id]["score"] += 3 / rank
         scored[product.product_id]["sources"].add("keyword")
 
     for rank, product in enumerate(vector_search(query, limit=limit), start=1):
         scored.setdefault(product.product_id, {"product": product, "score": 0, "sources": set()})
-        scored[product.product_id]["score"] += 1.5 / rank
+        scored[product.product_id]["score"] += 2 / rank
         scored[product.product_id]["sources"].add("vector")
 
     for rank, product in enumerate(graph_recommendation_products(user_id, limit=limit), start=1):
         scored.setdefault(product.product_id, {"product": product, "score": 0, "sources": set()})
-        scored[product.product_id]["score"] += 1 / rank
-        scored[product.product_id]["sources"].add("graph")
+        scored[product.product_id]["score"] += 0.35 / rank
+        scored[product.product_id]["sources"].add("personalized")
 
     ranked = sorted(scored.values(), key=lambda item: item["score"], reverse=True)[:limit]
-    return [{"product": item["product"], "sources": sorted(item["sources"])} for item in ranked]
+    return [
+        {
+            "product": item["product"],
+            "sources": sorted(item["sources"]),
+            "score": round(item["score"], 4),
+        }
+        for item in ranked
+    ]
 
 
 def generate_answer(message, products):
     context = "\n".join(
-        f"- {product['name']} | {product['category']} | {product['price']} VND | {product['description']}"
+        (
+            f"- {product['name']} | category: {product['category']} | brand: {product.get('brand') or 'N/A'} "
+            f"| price: {product['price']} VND | why retrieved: {', '.join(product.get('reasons') or [])} "
+            f"| description: {product['description']}"
+        )
         for product in products
     )
     prompt = (
-        "Bạn là chatbot tư vấn sản phẩm cho demo e-commerce sách. "
-        "Chỉ tư vấn dựa trên context sản phẩm bên dưới, trả lời ngắn gọn bằng tiếng Việt.\n\n"
-        f"Câu hỏi: {message}\n\nContext:\n{context}"
+        "You are a shopping assistant for a general ecommerce store, not a bookstore. "
+        "Answer in Vietnamese. Use only the product context below. "
+        "First address the shopper's question directly, then recommend at most 3 products. "
+        "For each recommendation, explain the concrete reason using product category, brand, description, or retrieval reason. "
+        "If the context does not match the question, say that clearly and suggest the closest available alternatives.\n\n"
+        f"Shopper question: {message}\n\nProduct context:\n{context}"
     )
     if os.getenv("GEMINI_API_KEY"):
         try:
@@ -171,9 +243,21 @@ def generate_answer(message, products):
         except (GeminiError, requests.RequestException):
             pass
     if products:
-        names = ", ".join(product["name"] for product in products[:3])
-        return f"Mình gợi ý {names}. Các sản phẩm này phù hợp nhất với nội dung bạn hỏi trong dữ liệu demo."
-    return "Mình chưa tìm thấy sản phẩm phù hợp trong dữ liệu demo."
+        return fallback_answer(message, products)
+    return "Mình chưa tìm thấy sản phẩm phù hợp trong dữ liệu demo. Bạn có thể mô tả nhu cầu cụ thể hơn, ví dụ danh mục, ngân sách hoặc mục đích sử dụng."
+
+
+def fallback_answer(message, products):
+    lines = [f"Mình tìm trong catalog theo câu hỏi: \"{message}\"."]
+    lines.append("Các lựa chọn gần nhất là:")
+    for product in products[:3]:
+        reasons = product.get("reasons") or ["phù hợp nhất trong dữ liệu hiện có"]
+        lines.append(
+            f"- {product['name']}: {product['category']}, giá {product['price']} VND. Lý do: {', '.join(reasons)}."
+        )
+    if any("personalized" in product.get("sources", []) for product in products[:3]):
+        lines.append("Một vài gợi ý có dùng lịch sử xem/thêm giỏ/mua hàng của bạn để cá nhân hóa.")
+    return "\n".join(lines)
 
 
 def gemini_generate(prompt):
@@ -195,7 +279,8 @@ def gemini_generate(prompt):
     return text
 
 
-def product_payload(product, sources=None):
+def product_payload(product, sources=None, score=None):
+    source_list = sources or []
     return {
         "id": product.product_id,
         "name": product.name,
@@ -204,7 +289,9 @@ def product_payload(product, sources=None):
         "brand": product.brand,
         "price": str(product.price),
         "stock": product.stock,
-        "sources": sources or [],
+        "sources": source_list,
+        "reasons": [SOURCE_LABELS.get(source, source) for source in source_list],
+        "score": score,
     }
 
 
@@ -236,6 +323,24 @@ def upsert_product_node(product):
                 category=product.category,
                 brand=product.brand,
                 price=float(product.price),
+            )
+    finally:
+        driver.close()
+
+
+def delete_stale_product_nodes(active_product_ids):
+    driver = neo4j_driver()
+    if not driver:
+        return
+    try:
+        with driver.session() as session:
+            session.run(
+                """
+                MATCH (p:Product)
+                WHERE NOT p.id IN $active_product_ids
+                DETACH DELETE p
+                """,
+                active_product_ids=[int(product_id) for product_id in active_product_ids],
             )
     finally:
         driver.close()
