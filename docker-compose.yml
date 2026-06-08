@@ -69,6 +69,7 @@ services:
     environment:
       DB_NAME: user_service
       STARTUP_DELAY: 15
+      POST_MIGRATE_COMMAND: python manage.py seed_admin
     ports:
       - "8001:8001"
     depends_on:
@@ -88,6 +89,7 @@ services:
     environment:
       DB_NAME: staff_service
       STARTUP_DELAY: 15
+      POST_MIGRATE_COMMAND: python manage.py seed_roles
     ports:
       - "8002:8002"
     depends_on:

@@ -7,8 +7,8 @@ from users.models import Address, User
 class UserPublicSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ["id", "email", "full_name", "phone", "dob", "is_active", "created_at"]
-        read_only_fields = ["id", "email", "is_active", "created_at"]
+        fields = ["id", "username", "email", "full_name", "phone", "dob", "role", "is_active", "created_at"]
+        read_only_fields = ["id", "username", "email", "role", "is_active", "created_at"]
 
 
 class RegisterSerializer(serializers.ModelSerializer):
@@ -25,7 +25,7 @@ class RegisterSerializer(serializers.ModelSerializer):
 
 
 class LoginSerializer(serializers.Serializer):
-    email = serializers.EmailField()
+    email = serializers.CharField()
     password = serializers.CharField(write_only=True)
 
 
@@ -47,4 +47,3 @@ class AddressSerializer(serializers.ModelSerializer):
             "is_default",
         ]
         read_only_fields = ["id"]
-

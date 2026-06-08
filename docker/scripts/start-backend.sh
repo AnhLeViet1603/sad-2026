@@ -20,4 +20,9 @@ until python manage.py migrate --noinput --fake-initial; do
   sleep 2
 done
 
+if [ -n "${POST_MIGRATE_COMMAND:-}" ]; then
+  echo "Running post-migration command: $POST_MIGRATE_COMMAND"
+  sh -c "$POST_MIGRATE_COMMAND"
+fi
+
 exec gunicorn "$DJANGO_WSGI" --bind "0.0.0.0:$PORT"

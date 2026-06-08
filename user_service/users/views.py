@@ -1,5 +1,6 @@
 import jwt
 from django.contrib.auth.hashers import check_password
+from django.db.models import Q
 from django.db import transaction
 from django.utils import timezone
 from rest_framework.decorators import api_view
@@ -23,8 +24,8 @@ def _require_user_id(request):
 
 
 def _token_pair(user):
-    access_token = create_access_token(user.id, role="USER")
-    refresh_token = create_refresh_token(user.id, role="USER")
+    access_token = create_access_token(user.id, role=user.role)
+    refresh_token = create_refresh_token(user.id, role=user.role)
     RefreshToken.objects.create(user_id=user.id, token=refresh_token)
     return {"access_token": access_token, "refresh_token": refresh_token, "token_type": "Bearer"}
 
@@ -46,7 +47,8 @@ def login(request):
         return error("VALIDATION_ERROR", serializer.errors, status=400)
 
     try:
-        user = User.objects.get(email=serializer.validated_data["email"], is_active=True)
+        identifier = serializer.validated_data["email"]
+        user = User.objects.get(Q(email=identifier) | Q(username=identifier), is_active=True)
     except User.DoesNotExist:
         return error("INVALID_CREDENTIALS", "Email or password is incorrect", status=401)
 
@@ -174,4 +176,3 @@ def verify_token(request):
         return error("INVALID_TOKEN", "Token is invalid or expired", status=401)
 
     return ok({"valid": True, "payload": payload})
-

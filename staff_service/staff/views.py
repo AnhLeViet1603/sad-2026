@@ -1,5 +1,6 @@
 from rest_framework.decorators import api_view
 
+from common.permissions import require_admin, require_staff
 from common.responses import error, ok
 from common.views import health_response
 from staff.models import Department, Permission, Role, Staff
@@ -19,9 +20,17 @@ def _serialize_or_error(serializer):
 
 @api_view(["GET", "POST"])
 def staff_collection(request):
+    auth_error = require_staff(request)
+    if auth_error:
+        return auth_error
+
     if request.method == "GET":
         queryset = Staff.objects.all().order_by("id")
         return ok(StaffSerializer(queryset, many=True).data)
+
+    auth_error = require_admin(request)
+    if auth_error:
+        return auth_error
 
     instance, response_error = _serialize_or_error(StaffSerializer(data=request.data))
     if response_error:
@@ -31,6 +40,10 @@ def staff_collection(request):
 
 @api_view(["GET", "PATCH", "DELETE"])
 def staff_detail(request, staff_id):
+    auth_error = require_staff(request)
+    if auth_error:
+        return auth_error
+
     try:
         instance = Staff.objects.get(id=staff_id)
     except Staff.DoesNotExist:
@@ -38,6 +51,10 @@ def staff_detail(request, staff_id):
 
     if request.method == "GET":
         return ok(StaffSerializer(instance).data)
+
+    auth_error = require_admin(request)
+    if auth_error:
+        return auth_error
 
     if request.method == "DELETE":
         instance.delete()
@@ -52,9 +69,17 @@ def staff_detail(request, staff_id):
 
 @api_view(["GET", "POST"])
 def role_collection(request):
+    auth_error = require_staff(request)
+    if auth_error:
+        return auth_error
+
     if request.method == "GET":
         queryset = Role.objects.all().order_by("id")
         return ok(RoleSerializer(queryset, many=True).data)
+
+    auth_error = require_admin(request)
+    if auth_error:
+        return auth_error
 
     instance, response_error = _serialize_or_error(RoleSerializer(data=request.data))
     if response_error:
@@ -64,6 +89,10 @@ def role_collection(request):
 
 @api_view(["PATCH", "DELETE"])
 def role_detail(request, role_id):
+    auth_error = require_admin(request)
+    if auth_error:
+        return auth_error
+
     try:
         instance = Role.objects.get(id=role_id)
     except Role.DoesNotExist:
@@ -82,9 +111,17 @@ def role_detail(request, role_id):
 
 @api_view(["GET", "POST"])
 def permission_collection(request):
+    auth_error = require_staff(request)
+    if auth_error:
+        return auth_error
+
     if request.method == "GET":
         queryset = Permission.objects.all().order_by("id")
         return ok(PermissionSerializer(queryset, many=True).data)
+
+    auth_error = require_admin(request)
+    if auth_error:
+        return auth_error
 
     instance, response_error = _serialize_or_error(PermissionSerializer(data=request.data))
     if response_error:
@@ -94,9 +131,17 @@ def permission_collection(request):
 
 @api_view(["GET", "POST"])
 def department_collection(request):
+    auth_error = require_staff(request)
+    if auth_error:
+        return auth_error
+
     if request.method == "GET":
         queryset = Department.objects.all().order_by("id")
         return ok(DepartmentSerializer(queryset, many=True).data)
+
+    auth_error = require_admin(request)
+    if auth_error:
+        return auth_error
 
     instance, response_error = _serialize_or_error(DepartmentSerializer(data=request.data))
     if response_error:
@@ -113,4 +158,3 @@ def check_role(request):
 
     has_role = Staff.objects.filter(user_id=user_id, is_active=True, roles__name=role_name).exists()
     return ok({"user_id": int(user_id), "role": role_name, "has_role": has_role})
-

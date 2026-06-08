@@ -1,6 +1,7 @@
 from django.db.models import Q
 from rest_framework.decorators import api_view
 
+from common.permissions import require_staff
 from common.responses import error, ok
 from common.views import health_response
 from products.models import Category, Inventory, Product
@@ -22,6 +23,10 @@ def product_collection(request):
         queryset = _product_queryset().order_by("-created_at")
         return ok(ProductSerializer(queryset, many=True).data)
 
+    auth_error = require_staff(request)
+    if auth_error:
+        return auth_error
+
     serializer = ProductSerializer(data=request.data)
     if not serializer.is_valid():
         return error("VALIDATION_ERROR", serializer.errors, status=400)
@@ -38,6 +43,10 @@ def product_detail(request, product_id):
 
     if request.method == "GET":
         return ok(ProductSerializer(product).data)
+
+    auth_error = require_staff(request)
+    if auth_error:
+        return auth_error
 
     if request.method == "DELETE":
         product.delete()
@@ -91,6 +100,10 @@ def inventory_detail(request, product_id):
     if request.method == "GET":
         return ok(InventorySerializer(inventory).data)
 
+    auth_error = require_staff(request)
+    if auth_error:
+        return auth_error
+
     serializer = InventorySerializer(inventory, data=request.data, partial=True)
     if not serializer.is_valid():
         return error("VALIDATION_ERROR", serializer.errors, status=400)
@@ -103,6 +116,10 @@ def category_collection(request):
     if request.method == "GET":
         return ok(CategorySerializer(Category.objects.all().order_by("name"), many=True).data)
 
+    auth_error = require_staff(request)
+    if auth_error:
+        return auth_error
+
     serializer = CategorySerializer(data=request.data)
     if not serializer.is_valid():
         return error("VALIDATION_ERROR", serializer.errors, status=400)
@@ -112,6 +129,10 @@ def category_collection(request):
 
 @api_view(["PATCH", "DELETE"])
 def category_detail(request, category_id):
+    auth_error = require_staff(request)
+    if auth_error:
+        return auth_error
+
     try:
         category = Category.objects.get(id=category_id)
     except Category.DoesNotExist:
@@ -150,7 +171,10 @@ def ai_export(request):
 
 @api_view(["POST"])
 def rebuild_embedding_placeholder(request, product_id):
+    auth_error = require_staff(request)
+    if auth_error:
+        return auth_error
+
     if not Product.objects.filter(id=product_id).exists():
         return error("PRODUCT_NOT_FOUND", "Product not found", status=404)
     return ok({"product_id": product_id, "status": "queued"}, "Embedding rebuild queued")
-

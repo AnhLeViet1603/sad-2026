@@ -16,6 +16,10 @@ function App() {
 
 function StoreApp() {
   const [token, setToken] = useState(localStorage.getItem("access_token") || "");
+  const [user, setUser] = useState(() => {
+    const stored = localStorage.getItem("current_user");
+    return stored ? JSON.parse(stored) : null;
+  });
   const [products, setProducts] = useState([]);
   const [cart, setCart] = useState(null);
   const [orders, setOrders] = useState([]);
@@ -67,6 +71,16 @@ function StoreApp() {
     setAddresses(response.data.data);
   }
 
+  async function loadCurrentUser() {
+    if (!token) {
+      setUser(null);
+      return;
+    }
+    const response = await api.get("/api/users/me");
+    setUser(response.data.data);
+    localStorage.setItem("current_user", JSON.stringify(response.data.data));
+  }
+
   async function loadRecommendations() {
     const response = await api.get("/api/ai/recommendations/home");
     setRecommendations(response.data.data.products || []);
@@ -78,6 +92,10 @@ function StoreApp() {
   }, []);
 
   useEffect(() => {
+    loadCurrentUser().catch(() => {
+      localStorage.removeItem("current_user");
+      setUser(null);
+    });
     loadCart().catch(() => {});
     loadOrders().catch(() => {});
     loadAddresses().catch(() => {});
@@ -98,16 +116,22 @@ function StoreApp() {
     event.preventDefault();
     const data = Object.fromEntries(new FormData(event.currentTarget));
     const response = await api.post(`/api/users/${mode}`, data);
+    const currentUser = response.data.data.user;
     localStorage.setItem("access_token", response.data.data.access_token);
     localStorage.setItem("refresh_token", response.data.data.refresh_token);
+    localStorage.setItem("current_user", JSON.stringify(currentUser));
     setToken(response.data.data.access_token);
+    setUser(currentUser);
     setMessage(mode === "login" ? "Logged in successfully." : "Account created successfully.");
+    return currentUser;
   }
 
   function logout() {
     localStorage.removeItem("access_token");
     localStorage.removeItem("refresh_token");
+    localStorage.removeItem("current_user");
     setToken("");
+    setUser(null);
     setCart(null);
     setOrders([]);
     setMessage("Logged out.");
@@ -124,6 +148,7 @@ function StoreApp() {
   const common = {
     api,
     token,
+    user,
     products,
     cart,
     orders,
@@ -149,6 +174,7 @@ function StoreApp() {
     <main>
       <Header
         token={token}
+        user={user}
         cartCount={cartCount}
         searchTerm={searchTerm}
         setSearchTerm={setSearchTerm}
@@ -164,6 +190,7 @@ function StoreApp() {
         <Route path="/orders" element={<OrdersPage {...common} />} />
         <Route path="/account" element={<AccountPage {...common} />} />
         <Route path="/login" element={<AuthPage handleAuth={handleAuth} showError={showError} />} />
+        <Route path="/ops" element={<AdminPage {...common} />} />
         <Route path="/admin" element={<AdminPage {...common} />} />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
@@ -172,7 +199,8 @@ function StoreApp() {
   );
 }
 
-function Header({ token, cartCount, searchTerm, setSearchTerm, logout }) {
+function Header({ token, user, cartCount, searchTerm, setSearchTerm, logout }) {
+  const canUseOps = isStaffUser(user);
   return (
     <header className="topbar">
       <Link className="brand" to="/">
@@ -192,6 +220,7 @@ function Header({ token, cartCount, searchTerm, setSearchTerm, logout }) {
         <NavLink to="/cart">Cart{cartCount > 0 ? <b>{cartCount}</b> : null}</NavLink>
         <NavLink to="/orders">Orders</NavLink>
         <NavLink to="/account">Account</NavLink>
+        {canUseOps && <NavLink to="/ops">Ops</NavLink>}
       </nav>
       {token ? (
         <button className="ghost" onClick={logout}>Logout</button>
@@ -487,8 +516,8 @@ function AuthPage({ handleAuth, showError }) {
   const [mode, setMode] = useState("login");
   const navigate = useNavigate();
   async function submit(event) {
-    await handleAuth(mode, event);
-    navigate("/products");
+    const user = await handleAuth(mode, event);
+    navigate(isStaffUser(user) ? "/ops" : "/products");
   }
   return (
     <section className="auth-page">
@@ -501,7 +530,7 @@ function AuthPage({ handleAuth, showError }) {
           <button className={mode === "register" ? "active" : ""} onClick={() => setMode("register")}>Register</button>
         </div>
         <form className="checkout-form" onSubmit={(event) => submit(event).catch(showError)}>
-          <input name="email" type="email" placeholder="email@example.com" required />
+          <input name="email" type="text" placeholder="Email or username" required />
           <input name="password" type="password" placeholder="Password" required />
           {mode === "register" && <input name="full_name" placeholder="Full name" required />}
           <button type="submit">{mode === "login" ? "Login" : "Create account"}</button>
@@ -651,7 +680,26 @@ function FloatingAssistant({ api, showError }) {
   );
 }
 
-function AdminPage({ api, products, loadProducts, loadOrders, loadRecommendations, showError }) {
+function AdminPage({ api, token, user, products, loadProducts, loadOrders, loadRecommendations, showError, setMessage }) {
+  const navigate = useNavigate();
+  const canUseOps = isStaffUser(user);
+
+  useEffect(() => {
+    if (!token) {
+      setMessage("Please login with an admin or staff account to open Ops.");
+      navigate("/login");
+      return;
+    }
+    if (user && !canUseOps) {
+      setMessage("Your account does not have permission to open Ops.");
+      navigate("/products");
+    }
+  }, [token, user, canUseOps, navigate, setMessage]);
+
+  if (!token || !canUseOps) {
+    return null;
+  }
+
   async function syncProducts() {
     await api.post("/api/ai/sync-products");
     await loadProducts();
@@ -802,6 +850,11 @@ function productImage(product, seed = "product") {
 
 function formatPrice(value) {
   return `${Number(value || 0).toLocaleString("vi-VN")} VND`;
+}
+
+function isStaffUser(user) {
+  const role = String(user?.role || "").toUpperCase();
+  return ["ADMIN", "STAFF", "PRODUCT_MANAGER", "ORDER_MANAGER"].includes(role);
 }
 
 createRoot(document.getElementById("root")).render(<App />);

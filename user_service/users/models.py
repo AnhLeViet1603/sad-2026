@@ -2,11 +2,19 @@ from django.db import models
 
 
 class User(models.Model):
+    ROLE_CHOICES = [
+        ("USER", "User"),
+        ("STAFF", "Staff"),
+        ("ADMIN", "Admin"),
+    ]
+
+    username = models.CharField(max_length=150, unique=True, null=True, blank=True)
     email = models.EmailField(unique=True)
     password = models.CharField(max_length=255)
     full_name = models.CharField(max_length=255)
     phone = models.CharField(max_length=20, null=True, blank=True)
     dob = models.DateField(null=True, blank=True)
+    role = models.CharField(max_length=30, choices=ROLE_CHOICES, default="USER")
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
 

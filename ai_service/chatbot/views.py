@@ -13,6 +13,7 @@ from chatbot.services import (
     sync_products_from_service,
     track_behavior_graph,
 )
+from common.permissions import require_staff
 from common.responses import error, ok
 from common.views import health_response
 
@@ -24,6 +25,10 @@ def health(request):
 
 @api_view(["POST"])
 def sync_products(request):
+    auth_error = require_staff(request)
+    if auth_error:
+        return auth_error
+
     try:
         count = sync_products_from_service()
     except requests.RequestException:
@@ -35,6 +40,10 @@ def sync_products(request):
 
 @api_view(["POST"])
 def rebuild_product_embeddings(request):
+    auth_error = require_staff(request)
+    if auth_error:
+        return auth_error
+
     count = rebuild_embeddings()
     return ok({"embedded": count}, "Embeddings rebuilt")
 

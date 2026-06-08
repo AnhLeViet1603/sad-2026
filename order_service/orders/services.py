@@ -33,17 +33,18 @@ def clear_cart(request):
     return _extract(response, "Cart Service")
 
 
-def create_payment(order, method):
+def create_payment(order, method, request=None):
     base_url = os.getenv("PAYMENT_SERVICE_URL", "http://localhost:8006").rstrip("/")
     response = requests.post(
         f"{base_url}/api/payments",
         json={"order_id": order.id, "user_id": order.user_id, "amount": str(order.total_amount), "method": method},
+        headers=_headers(request) if request else {},
         timeout=5,
     )
     return _extract(response, "Payment Service")
 
 
-def create_shipment(order):
+def create_shipment(order, request=None):
     base_url = os.getenv("SHIPPING_SERVICE_URL", "http://localhost:8007").rstrip("/")
     response = requests.post(
         f"{base_url}/api/shipping/shipments",
@@ -58,7 +59,7 @@ def create_shipment(order):
             "detail": order.detail,
             "shipping_fee": str(order.shipping_fee),
         },
+        headers=_headers(request) if request else {},
         timeout=5,
     )
     return _extract(response, "Shipping Service")
-

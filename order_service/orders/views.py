@@ -4,6 +4,7 @@ import requests
 from django.db import transaction
 from rest_framework.decorators import api_view
 
+from common.permissions import STAFF_ROLES, require_staff, require_user, role_name
 from common.responses import error, ok
 from common.views import health_response
 from orders.models import Order, OrderItem, OrderStatusHistory
@@ -17,16 +18,18 @@ def health(request):
 
 
 def _require_user_id(request):
-    if not request.user_id:
-        return None, error("UNAUTHORIZED", "Authentication token is required", status=401)
-    return int(request.user_id), None
+    return require_user(request)
 
 
 @api_view(["GET"])
 def order_collection(request):
+    user_id, auth_error = _require_user_id(request)
+    if auth_error:
+        return auth_error
+
     queryset = Order.objects.prefetch_related("items", "history").order_by("-created_at")
-    if request.user_id:
-        queryset = queryset.filter(user_id=request.user_id)
+    if role_name(request) not in STAFF_ROLES:
+        queryset = queryset.filter(user_id=user_id)
     return ok(OrderSerializer(queryset, many=True).data)
 
 
@@ -80,8 +83,8 @@ def checkout(request):
         OrderStatusHistory.objects.create(order=order, status=order.status, note="Order created from cart")
 
     try:
-        payment = create_payment(order, serializer.validated_data["payment_method"])
-        shipment = create_shipment(order)
+        payment = create_payment(order, serializer.validated_data["payment_method"], request)
+        shipment = create_shipment(order, request)
         clear_cart(request)
     except DownstreamServiceError as exc:
         return error("CHECKOUT_PARTIAL_FAILURE", str(exc), status=502)
@@ -108,18 +111,26 @@ def checkout(request):
 
 @api_view(["GET"])
 def order_detail(request, order_id):
+    user_id, auth_error = _require_user_id(request)
+    if auth_error:
+        return auth_error
+
     try:
         order = Order.objects.prefetch_related("items", "history").get(id=order_id)
     except Order.DoesNotExist:
         return error("ORDER_NOT_FOUND", "Order not found", status=404)
 
-    if request.user_id and order.user_id != int(request.user_id):
+    if role_name(request) not in STAFF_ROLES and order.user_id != user_id:
         return error("FORBIDDEN", "You cannot access this order", status=403)
     return ok(OrderSerializer(order).data)
 
 
 @api_view(["PATCH"])
 def update_status(request, order_id):
+    auth_error = require_staff(request)
+    if auth_error:
+        return auth_error
+
     try:
         order = Order.objects.get(id=order_id)
     except Order.DoesNotExist:
@@ -137,4 +148,3 @@ def update_status(request, order_id):
         note=serializer.validated_data.get("note"),
     )
     return ok(OrderSerializer(order).data, "Order status updated")
-

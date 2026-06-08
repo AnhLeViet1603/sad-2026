@@ -8,8 +8,8 @@ class JWTAuthenticationMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
-        request.user_id = None
-        request.user_role = None
+        request.user_id = request.headers.get("X-User-Id")
+        request.user_role = request.headers.get("X-User-Role")
 
         token = get_bearer_token(request)
         if token:
@@ -22,4 +22,3 @@ class JWTAuthenticationMiddleware:
                 pass
 
         return self.get_response(request)
-
