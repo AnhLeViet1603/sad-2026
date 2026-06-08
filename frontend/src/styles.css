@@ -247,6 +247,11 @@ nav a b {
   gap: 10px;
 }
 
+.ops-stack {
+  display: grid;
+  gap: 12px;
+}
+
 .auth-form {
   display: grid;
   grid-template-columns: repeat(4, minmax(120px, 1fr));
@@ -432,6 +437,10 @@ nav a b {
   gap: 24px;
   grid-template-columns: minmax(320px, 0.9fr) minmax(320px, 1fr) minmax(260px, 0.45fr);
   padding: 28px;
+}
+
+.detail-editor {
+  padding: 0 28px 28px;
 }
 
 .detail-gallery,

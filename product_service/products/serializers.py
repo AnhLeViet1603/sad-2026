@@ -88,12 +88,32 @@ class ProductSerializer(serializers.ModelSerializer):
         return product
 
     def update(self, instance, validated_data):
+        images = validated_data.pop("images", None)
         inventory = validated_data.pop("inventory", None)
         for field, value in validated_data.items():
             setattr(instance, field, value)
         instance.save()
 
+        if images is not None:
+            primary_image = images[0] if images else None
+            if primary_image:
+                primary_defaults = {
+                    "image_url": primary_image["image_url"],
+                    "alt_text": primary_image.get("alt_text"),
+                }
+                image_instance, _ = ProductImage.objects.update_or_create(
+                    product=instance,
+                    is_primary=True,
+                    defaults=primary_defaults,
+                )
+                ProductImage.objects.filter(product=instance).exclude(id=image_instance.id).delete()
+                instance._prefetched_objects_cache = {}
+            else:
+                ProductImage.objects.filter(product=instance).delete()
+                instance._prefetched_objects_cache = {}
+
         if inventory is not None:
-            Inventory.objects.update_or_create(product=instance, defaults=inventory)
+            inventory_instance, _ = Inventory.objects.update_or_create(product=instance, defaults=inventory)
+            instance._state.fields_cache["inventory"] = inventory_instance
 
         return instance

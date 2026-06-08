@@ -25,6 +25,7 @@ function StoreApp() {
   const [orders, setOrders] = useState([]);
   const [addresses, setAddresses] = useState([]);
   const [recommendations, setRecommendations] = useState([]);
+  const [catalogCategories, setCatalogCategories] = useState([]);
   const [message, setMessage] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
 
@@ -38,7 +39,7 @@ function StoreApp() {
   }, [token]);
 
   const cartCount = (cart?.items || []).reduce((sum, item) => sum + Number(item.quantity || 0), 0);
-  const categories = useMemo(() => {
+  const productCategories = useMemo(() => {
     const byId = new Map();
     products.forEach((product) => {
       const category = normalizeCategory(product.category);
@@ -46,11 +47,17 @@ function StoreApp() {
     });
     return [...byId.values()].slice(0, 10);
   }, [products]);
+  const categories = catalogCategories.length ? catalogCategories : productCategories;
   const filteredProducts = useMemo(() => filterProducts(products, searchTerm), [products, searchTerm]);
 
   async function loadProducts() {
     const response = await api.get("/api/products");
     setProducts(response.data.data);
+  }
+
+  async function loadCategories() {
+    const response = await api.get("/api/products/categories");
+    setCatalogCategories(response.data.data);
   }
 
   async function loadCart() {
@@ -88,6 +95,7 @@ function StoreApp() {
 
   useEffect(() => {
     loadProducts().catch(showError);
+    loadCategories().catch(() => {});
     loadRecommendations().catch(() => {});
   }, []);
 
@@ -164,6 +172,7 @@ function StoreApp() {
     requireAuth,
     addToCart,
     loadProducts,
+    loadCategories,
     loadCart,
     loadOrders,
     loadAddresses,
@@ -284,12 +293,14 @@ function ProductsPage({ filteredProducts, products, categories, searchTerm, setS
   );
 }
 
-function ProductDetailPage({ api, token, addToCart, showError, requireAuth, setMessage }) {
+function ProductDetailPage({ api, token, user, categories, addToCart, showError, requireAuth, setMessage, loadProducts }) {
   const { productId } = useParams();
   const [product, setProduct] = useState(null);
   const [reviews, setReviews] = useState([]);
   const [summary, setSummary] = useState(null);
   const [related, setRelated] = useState([]);
+  const [editing, setEditing] = useState(false);
+  const canEditProduct = isStaffUser(user);
 
   useEffect(() => {
     let cancelled = false;
@@ -323,6 +334,15 @@ function ProductDetailPage({ api, token, addToCart, showError, requireAuth, setM
     event.currentTarget.reset();
   }
 
+  async function updateProduct(event) {
+    event.preventDefault();
+    const response = await api.patch(`/api/products/${product.id}`, productPayload(event.currentTarget));
+    setProduct(response.data.data);
+    await loadProducts();
+    setEditing(false);
+    setMessage("Product updated.");
+  }
+
   if (!product) return <EmptyState title="Loading product" body="Fetching product details from Product Service." />;
 
   return (
@@ -345,9 +365,26 @@ function ProductDetailPage({ api, token, addToCart, showError, requireAuth, setM
           <span>Price</span>
           <strong>{formatPrice(product.price)}</strong>
           <button onClick={() => addToCart(product).catch(showError)}>Add to cart</button>
+          {canEditProduct && (
+            <button className="ghost" onClick={() => setEditing((value) => !value)}>
+              {editing ? "Close editor" : "Edit product"}
+            </button>
+          )}
           <small>Checkout creates PURCHASED relationships in the recommendation graph.</small>
         </aside>
       </section>
+      {editing && canEditProduct && (
+        <section className="detail-editor">
+          <form className="panel checkout-form" key={product.id} onSubmit={(event) => updateProduct(event).catch(showError)}>
+            <div className="section-head compact">
+              <h2>Edit product</h2>
+              <span>#{product.id}</span>
+            </div>
+            <ProductFields categories={categories} product={product} />
+            <button type="submit">Update product</button>
+          </form>
+        </section>
+      )}
       <section className="content-grid">
         <div className="panel">
           <div className="section-head compact">
@@ -680,7 +717,19 @@ function FloatingAssistant({ api, showError }) {
   );
 }
 
-function AdminPage({ api, token, user, products, loadProducts, loadOrders, loadRecommendations, showError, setMessage }) {
+function AdminPage({
+  api,
+  token,
+  user,
+  products,
+  categories,
+  loadProducts,
+  loadCategories,
+  loadOrders,
+  loadRecommendations,
+  showError,
+  setMessage,
+}) {
   const navigate = useNavigate();
   const canUseOps = isStaffUser(user);
 
@@ -712,6 +761,15 @@ function AdminPage({ api, token, user, products, loadProducts, loadOrders, loadR
     event.preventDefault();
     await api.post("/api/products/categories", Object.fromEntries(new FormData(event.currentTarget)));
     event.currentTarget.reset();
+    await loadCategories();
+    setMessage("Category created.");
+  }
+  async function createProduct(event) {
+    event.preventDefault();
+    await api.post("/api/products", productPayload(event.currentTarget));
+    event.currentTarget.reset();
+    await loadProducts();
+    setMessage("Product created.");
   }
   return (
     <section className="ops-layout">
@@ -726,13 +784,59 @@ function AdminPage({ api, token, user, products, loadProducts, loadOrders, loadR
         </div>
         <p>{products.length} products loaded. Run `seed_graph_demo` in the AI container for purchase graph data.</p>
       </div>
-      <form className="panel checkout-form" onSubmit={(event) => createCategory(event).catch(showError)}>
-        <h2>Add category</h2>
-        <input name="name" placeholder="Category name" required />
-        <input name="slug" placeholder="category-slug" required />
-        <button type="submit">Create category</button>
-      </form>
+      <div className="ops-stack">
+        <form className="panel checkout-form" onSubmit={(event) => createProduct(event).catch(showError)}>
+          <h2>Add product</h2>
+          <ProductFields categories={categories} />
+          <button type="submit">Create product</button>
+        </form>
+        <form className="panel checkout-form" onSubmit={(event) => createCategory(event).catch(showError)}>
+          <h2>Add category</h2>
+          <input name="name" placeholder="Category name" required />
+          <input name="slug" placeholder="category-slug" required />
+          <button type="submit">Create category</button>
+        </form>
+      </div>
     </section>
+  );
+}
+
+function ProductFields({ categories, product = null }) {
+  const inventory = product?.inventory || {};
+  return (
+    <>
+      <input name="name" defaultValue={product?.name || ""} placeholder="Product name" required />
+      <input name="slug" defaultValue={product?.slug || ""} placeholder="product-slug" required />
+      <textarea name="description" defaultValue={product?.description || ""} placeholder="Description" required />
+      <div className="form-two">
+        <input name="price" defaultValue={product?.price || ""} min="0" placeholder="Price" required step="0.01" type="number" />
+        <input
+          name="quantity"
+          defaultValue={inventory.quantity ?? ""}
+          min="0"
+          placeholder="Stock quantity"
+          required
+          type="number"
+        />
+      </div>
+      <div className="form-two">
+        <select name="category_id" defaultValue={product?.category?.id || ""}>
+          <option value="">No category</option>
+          {categories.map((category) => (
+            <option key={category.id || category.slug} value={category.id}>
+              {category.name}
+            </option>
+          ))}
+        </select>
+        <select name="status" defaultValue={product?.status || "ACTIVE"}>
+          <option value="ACTIVE">Active</option>
+          <option value="INACTIVE">Inactive</option>
+          <option value="OUT_OF_STOCK">Out of stock</option>
+        </select>
+      </div>
+      <input name="brand" defaultValue={product?.brand || ""} placeholder="Brand" />
+      <input name="image_url" defaultValue={product?.images?.[0]?.image_url || ""} placeholder="Image URL" type="url" />
+    </>
   );
 }
 
@@ -855,6 +959,26 @@ function formatPrice(value) {
 function isStaffUser(user) {
   const role = String(user?.role || "").toUpperCase();
   return ["ADMIN", "STAFF", "PRODUCT_MANAGER", "ORDER_MANAGER"].includes(role);
+}
+
+function productPayload(form) {
+  const data = Object.fromEntries(new FormData(form));
+  const payload = {
+    name: data.name,
+    slug: data.slug,
+    description: data.description,
+    price: data.price,
+    status: data.status || "ACTIVE",
+    inventory: {
+      quantity: Number(data.quantity || 0),
+    },
+  };
+  if (data.brand) payload.brand = data.brand;
+  if (data.category_id) payload.category_id = data.category_id;
+  payload.images = data.image_url
+    ? [{ image_url: data.image_url, alt_text: data.name, is_primary: true }]
+    : [];
+  return payload;
 }
 
 createRoot(document.getElementById("root")).render(<App />);
