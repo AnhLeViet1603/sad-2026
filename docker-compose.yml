@@ -45,16 +45,21 @@ services:
       - neo4j_data:/data
 
   api_gateway:
-    build:
-      context: .
-      dockerfile: docker/backend.Dockerfile
-      target: api_gateway
-    env_file: .env
+    image: nginx:1.27-alpine
     ports:
-      - "8000:8000"
+      - "8000:80"
+    volumes:
+      - ./api_gateway/nginx.conf:/etc/nginx/nginx.conf:ro
     depends_on:
       - user_service
+      - staff_service
       - product_service
+      - cart_service
+      - order_service
+      - payment_service
+      - shipping_service
+      - comment_service
+      - ai_service
     networks:
       default:
         aliases:

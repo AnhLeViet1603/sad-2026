@@ -28,14 +28,6 @@ COPY docker/requirements/backend-ai.txt /tmp/requirements.txt
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install -r /tmp/requirements.txt
 
-FROM django-base AS api_gateway
-COPY common /app/common
-COPY api_gateway /app
-EXPOSE 8000
-ENV DJANGO_WSGI=gateway.wsgi:application
-ENV PORT=8000
-CMD ["start-backend"]
-
 FROM mysql-base AS user_service
 COPY common /app/common
 COPY user_service /app
