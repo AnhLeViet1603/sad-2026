@@ -5,7 +5,7 @@ from common.permissions import require_staff
 from common.responses import error, ok
 from common.views import health_response
 from products.models import Category, Inventory, Product
-from products.serializers import CategorySerializer, InventorySerializer, ProductSerializer
+from products.serializers import CategorySerializer, InventorySerializer, PRODUCT_TYPE_CONFIG, ProductSerializer
 
 
 @api_view(["GET"])
@@ -14,7 +14,11 @@ def health(request):
 
 
 def _product_queryset():
-    return Product.objects.select_related("category", "inventory").prefetch_related("images", "attribute_values")
+    return Product.objects.select_related(
+        "category",
+        "inventory",
+        *[config["related_name"] for config in PRODUCT_TYPE_CONFIG.values()],
+    ).prefetch_related("images", "attribute_values")
 
 
 @api_view(["GET", "POST"])
@@ -64,6 +68,7 @@ def product_search(request):
     queryset = _product_queryset().filter(status="ACTIVE")
     query = request.query_params.get("q")
     category = request.query_params.get("category")
+    product_type = request.query_params.get("product_type")
     min_price = request.query_params.get("min_price")
     max_price = request.query_params.get("max_price")
 
@@ -71,6 +76,11 @@ def product_search(request):
         queryset = queryset.filter(Q(name__icontains=query) | Q(description__icontains=query) | Q(brand__icontains=query))
     if category:
         queryset = queryset.filter(Q(category_id=category) | Q(category__slug=category))
+    if product_type:
+        config = PRODUCT_TYPE_CONFIG.get(product_type)
+        if not config:
+            return error("INVALID_PRODUCT_TYPE", "Unknown product type", status=400)
+        queryset = queryset.filter(**{f"{config['related_name']}__isnull": False})
     if min_price:
         queryset = queryset.filter(price__gte=min_price)
     if max_price:
@@ -86,7 +96,15 @@ def related_products(request, product_id):
     except Product.DoesNotExist:
         return error("PRODUCT_NOT_FOUND", "Product not found", status=404)
 
-    queryset = _product_queryset().filter(status="ACTIVE", category=product.category).exclude(id=product.id)[:8]
+    product_type = ProductSerializer(product).data["type"]
+    queryset = _product_queryset().filter(status="ACTIVE", category=product.category).exclude(id=product.id)
+    config = PRODUCT_TYPE_CONFIG.get(product_type)
+    if config:
+        same_type = queryset.filter(**{f"{config['related_name']}__isnull": False})[:4]
+        mixed_type = queryset.exclude(**{f"{config['related_name']}__isnull": False})[:4]
+        queryset = list(same_type) + list(mixed_type)
+    else:
+        queryset = queryset[:8]
     return ok(ProductSerializer(queryset, many=True).data)
 
 
@@ -155,6 +173,7 @@ def ai_export(request):
     data = []
     for product in products:
         inventory = getattr(product, "inventory", None)
+        serialized = ProductSerializer(product).data
         data.append(
             {
                 "id": product.id,
@@ -164,6 +183,8 @@ def ai_export(request):
                 "category": product.category.name if product.category else None,
                 "brand": product.brand,
                 "stock": inventory.available_quantity if inventory else 0,
+                "product_type": serialized["type"],
+                "type_details": serialized["type_details"],
             }
         )
     return ok(data)
