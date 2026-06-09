@@ -533,6 +533,57 @@ nav a b {
   gap: 12px;
 }
 
+.type-fields {
+  border: 1px solid #e2ded6;
+  border-radius: 8px;
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 12px;
+}
+
+.type-fields legend {
+  color: #0f766e;
+  font-size: 12px;
+  font-weight: 850;
+  padding: 0 6px;
+  text-transform: uppercase;
+}
+
+.type-field-grid,
+.type-details {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.type-field-grid label {
+  display: grid;
+  gap: 5px;
+}
+
+.type-field-grid label span,
+.type-details dt {
+  color: #69707a;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.type-details {
+  margin: 0;
+}
+
+.type-details div {
+  background: #f8f6f2;
+  border: 1px solid #ece8df;
+  border-radius: 6px;
+  padding: 9px 10px;
+}
+
+.type-details dd {
+  margin: 0;
+}
+
 .form-two {
   display: grid;
   gap: 12px;
@@ -671,6 +722,84 @@ nav a b {
   position: fixed;
   right: 22px;
   z-index: 40;
+}
+
+.modal-backdrop {
+  align-items: center;
+  background: rgba(17, 24, 39, 0.46);
+  display: grid;
+  inset: 0;
+  justify-items: center;
+  padding: 18px;
+  position: fixed;
+  z-index: 60;
+}
+
+.recommend-modal {
+  background: #ffffff;
+  border: 1px solid #e2ded6;
+  border-radius: 8px;
+  box-shadow: 0 24px 72px rgba(17, 24, 39, 0.28);
+  display: grid;
+  gap: 16px;
+  max-height: min(760px, calc(100vh - 36px));
+  overflow-y: auto;
+  padding: 18px;
+  width: min(760px, calc(100vw - 36px));
+}
+
+.modal-head,
+.modal-actions {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.recommend-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.recommend-card {
+  align-items: center;
+  border: 1px solid #ece8df;
+  border-radius: 8px;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 76px minmax(0, 1fr) auto;
+  padding: 10px;
+}
+
+.recommend-card a {
+  display: block;
+}
+
+.recommend-card img {
+  aspect-ratio: 1;
+  border-radius: 6px;
+  display: block;
+  object-fit: cover;
+  width: 100%;
+}
+
+.recommend-card div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.recommend-card div span {
+  color: #0f766e;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.recommend-card strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .chat-launcher {
@@ -827,9 +956,19 @@ nav a b {
 
   .auth-form,
   .form-two,
+  .type-field-grid,
+  .type-details,
+  .recommend-grid,
   .cart-line,
   .order-row,
   .address-card {
+    grid-template-columns: 1fr;
+  }
+
+  .modal-head,
+  .modal-actions,
+  .recommend-card {
+    align-items: stretch;
     grid-template-columns: 1fr;
   }
 

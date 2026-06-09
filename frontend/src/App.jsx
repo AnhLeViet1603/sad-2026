@@ -26,6 +26,7 @@ function StoreApp() {
   const [addresses, setAddresses] = useState([]);
   const [recommendations, setRecommendations] = useState([]);
   const [catalogCategories, setCatalogCategories] = useState([]);
+  const [cartRecommendationPopup, setCartRecommendationPopup] = useState(null);
   const [message, setMessage] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
 
@@ -151,7 +152,29 @@ function StoreApp() {
     await api.post("/api/ai/track", { product_id: product.id, event_type: "ADDED_TO_CART" }).catch(() => {});
     await loadCart();
     await loadRecommendations().catch(() => {});
+    await loadCartRecommendationPopup(product);
     setMessage(`${product.name} was added to cart.`);
+  }
+
+  async function loadCartRecommendationPopup(product) {
+    let popupProducts = [];
+    const lstmResponse = await api
+      .get(`/api/ai/recommendations/lstm?exclude_product_id=${product.id}`)
+      .catch(() => null);
+    popupProducts = lstmResponse?.data?.data?.products || [];
+
+    if (!popupProducts.length) {
+      const relatedResponse = await api
+        .get(`/api/products/${product.id}/related`)
+        .catch(() => null);
+      popupProducts = relatedResponse?.data?.data || [];
+    }
+
+    popupProducts = popupProducts.filter((item) => Number(item.id) !== Number(product.id)).slice(0, 4);
+    setCartRecommendationPopup({
+      addedProduct: product,
+      products: popupProducts,
+    });
   }
 
   const common = {
@@ -204,6 +227,12 @@ function StoreApp() {
         <Route path="/admin" element={<AdminPage {...common} />} />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
+      <CartRecommendationPopup
+        popup={cartRecommendationPopup}
+        onClose={() => setCartRecommendationPopup(null)}
+        onAdd={addToCart}
+        showError={showError}
+      />
       <FloatingAssistant api={api} showError={showError} />
     </main>
   );
@@ -353,7 +382,7 @@ function ProductDetailPage({ api, token, user, categories, addToCart, showError,
           <img src={productImage(product, "detail")} alt={product.name} />
         </div>
         <div className="detail-copy">
-          <p className="eyebrow">{categoryName(product.category)}</p>
+          <p className="eyebrow">{categoryName(product.category)} / {productTypeLabel(product.type)}</p>
           <h1>{product.name}</h1>
           <p>{product.description}</p>
           <div className="detail-stats">
@@ -361,6 +390,7 @@ function ProductDetailPage({ api, token, user, categories, addToCart, showError,
             <span>{summary?.review_count || 0} reviews</span>
             <span>{product.inventory?.available_quantity ?? 0} in stock</span>
           </div>
+          <TypeDetails details={product.type_details} />
         </div>
         <aside className="purchase-box">
           <span>Price</span>
@@ -804,6 +834,7 @@ function AdminPage({
 
 function ProductFields({ categories, product = null }) {
   const inventory = product?.inventory || {};
+  const [productType, setProductType] = useState(product?.type || "book");
   return (
     <>
       <input name="name" defaultValue={product?.name || ""} placeholder="Product name" required />
@@ -835,9 +866,55 @@ function ProductFields({ categories, product = null }) {
           <option value="OUT_OF_STOCK">Out of stock</option>
         </select>
       </div>
+      <select
+        name="product_type"
+        value={productType}
+        disabled={!!product}
+        onChange={(event) => setProductType(event.target.value)}
+      >
+        {PRODUCT_TYPES.map((type) => (
+          <option key={type.value} value={type.value}>
+            {type.label}
+          </option>
+        ))}
+      </select>
+      {product && <input name="product_type" type="hidden" value={productType} />}
+      <TypeDetailFields productType={productType} details={product?.type_details || {}} />
       <input name="brand" defaultValue={product?.brand || ""} placeholder="Brand" />
       <input name="image_url" defaultValue={product?.images?.[0]?.image_url || ""} placeholder="Image URL" type="url" />
     </>
+  );
+}
+
+function TypeDetailFields({ productType, details }) {
+  const fields = PRODUCT_TYPE_FIELDS[productType] || [];
+  if (!fields.length) return null;
+  return (
+    <fieldset className="type-fields">
+      <legend>{productTypeLabel(productType)} details</legend>
+      <div className="type-field-grid">
+        {fields.map((field) => (
+          <label key={field.name}>
+            <span>{field.label}</span>
+            {field.type === "boolean" ? (
+              <select name={`type_${field.name}`} defaultValue={String(details[field.name] ?? field.defaultValue ?? false)}>
+                <option value="true">Yes</option>
+                <option value="false">No</option>
+              </select>
+            ) : (
+              <input
+                name={`type_${field.name}`}
+                defaultValue={details[field.name] ?? field.defaultValue ?? ""}
+                min={field.min}
+                placeholder={field.label}
+                step={field.step}
+                type={field.type || "text"}
+              />
+            )}
+          </label>
+        ))}
+      </div>
+    </fieldset>
   );
 }
 
@@ -883,7 +960,7 @@ function ProductCard({ product, onAdd, showError, compact = false }) {
       </Link>
       <div className="product-body">
         <div className="product-meta">
-          <span>{categoryName(product.category)}</span>
+          <span>{categoryName(product.category)} / {productTypeLabel(product.type || product.product_type)}</span>
           <span>{product.inventory?.available_quantity ?? product.stock ?? 0} left</span>
         </div>
         <h3><Link to={`/products/${product.id}`}>{product.name}</Link></h3>
@@ -894,6 +971,50 @@ function ProductCard({ product, onAdd, showError, compact = false }) {
         </div>
       </div>
     </article>
+  );
+}
+
+function CartRecommendationPopup({ popup, onClose, onAdd, showError }) {
+  if (!popup) return null;
+  const hasProducts = popup.products.length > 0;
+  return (
+    <div className="modal-backdrop" role="presentation" onClick={onClose}>
+      <section className="recommend-modal" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
+        <div className="modal-head">
+          <div>
+            <p className="eyebrow">Added to cart</p>
+            <h2>{popup.addedProduct.name}</h2>
+          </div>
+          <button className="ghost" onClick={onClose}>Close</button>
+        </div>
+        {hasProducts ? (
+          <>
+            <p>Customers often add these next.</p>
+            <div className="recommend-grid">
+              {popup.products.map((product) => (
+                <article className="recommend-card" key={product.id}>
+                  <Link to={`/products/${product.id}`} onClick={onClose}>
+                    <img src={productImage(product, "recommend")} alt={product.name} />
+                  </Link>
+                  <div>
+                    <span>{productTypeLabel(product.type || product.product_type)}</span>
+                    <strong>{product.name}</strong>
+                    <small>{formatPrice(product.price)}</small>
+                  </div>
+                  <button onClick={() => onAdd(product).catch(showError)}>Add</button>
+                </article>
+              ))}
+            </div>
+          </>
+        ) : (
+          <p>No recommendation is available yet. Train the LSTM model or sync product data to unlock smarter add-to-cart suggestions.</p>
+        )}
+        <div className="modal-actions">
+          <Link className="button ghost" to="/cart" onClick={onClose}>View cart</Link>
+          <Link className="button" to="/checkout" onClick={onClose}>Checkout</Link>
+        </div>
+      </section>
+    </div>
   );
 }
 
@@ -943,7 +1064,8 @@ function filterProducts(products, searchTerm) {
   if (!keyword) return products;
   return products.filter((product) => {
     const category = categoryName(product.category);
-    return [product.name, product.description, product.brand, category].some((value) =>
+    const typeDetails = Object.values(product.type_details || {}).join(" ");
+    return [product.name, product.description, product.brand, category, product.type, productTypeLabel(product.type), typeDetails].some((value) =>
       String(value || "").toLowerCase().includes(keyword)
     );
   });
@@ -964,12 +1086,15 @@ function isStaffUser(user) {
 
 function productPayload(form) {
   const data = Object.fromEntries(new FormData(form));
+  const productType = data.product_type || "book";
   const payload = {
     name: data.name,
     slug: data.slug,
     description: data.description,
     price: data.price,
     status: data.status || "ACTIVE",
+    product_type: productType,
+    type_details: productTypeDetails(data, productType),
     inventory: {
       quantity: Number(data.quantity || 0),
     },
@@ -981,5 +1106,124 @@ function productPayload(form) {
     : [];
   return payload;
 }
+
+function productTypeDetails(data, productType) {
+  const fields = PRODUCT_TYPE_FIELDS[productType] || [];
+  return fields.reduce((details, field) => {
+    const value = data[`type_${field.name}`];
+    if (value === undefined || value === "") return details;
+    if (field.type === "number") {
+      details[field.name] = Number(value);
+    } else if (field.type === "boolean") {
+      details[field.name] = value === "true";
+    } else {
+      details[field.name] = value;
+    }
+    return details;
+  }, {});
+}
+
+function productTypeLabel(value) {
+  const type = PRODUCT_TYPES.find((item) => item.value === value);
+  return type?.label || "Product";
+}
+
+function TypeDetails({ details }) {
+  const entries = Object.entries(details || {}).filter(([, value]) => value !== null && value !== "");
+  if (!entries.length) return null;
+  return (
+    <dl className="type-details">
+      {entries.slice(0, 6).map(([key, value]) => (
+        <div key={key}>
+          <dt>{humanizeKey(key)}</dt>
+          <dd>{String(value)}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+function humanizeKey(key) {
+  return String(key)
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+const PRODUCT_TYPES = [
+  { value: "book", label: "Book" },
+  { value: "laptop", label: "Laptop" },
+  { value: "phone", label: "Phone" },
+  { value: "toy", label: "Toy" },
+  { value: "tablet", label: "Tablet" },
+  { value: "headphones", label: "Headphones" },
+  { value: "camera", label: "Camera" },
+  { value: "smart_watch", label: "Smart watch" },
+  { value: "home_appliance", label: "Home appliance" },
+  { value: "clothing", label: "Clothing" },
+];
+
+const PRODUCT_TYPE_FIELDS = {
+  book: [
+    { name: "author", label: "Author", defaultValue: "Unknown author" },
+    { name: "publisher", label: "Publisher" },
+    { name: "isbn", label: "ISBN" },
+    { name: "language", label: "Language", defaultValue: "Vietnamese" },
+    { name: "page_count", label: "Page count", type: "number", min: 0 },
+  ],
+  laptop: [
+    { name: "cpu", label: "CPU", defaultValue: "Unknown CPU" },
+    { name: "ram_gb", label: "RAM GB", type: "number", min: 1, defaultValue: 8 },
+    { name: "storage_gb", label: "Storage GB", type: "number", min: 1, defaultValue: 256 },
+    { name: "gpu", label: "GPU" },
+    { name: "screen_size_inch", label: "Screen size", type: "number", min: 1, step: "0.1", defaultValue: 14 },
+  ],
+  phone: [
+    { name: "os", label: "OS", defaultValue: "Android" },
+    { name: "storage_gb", label: "Storage GB", type: "number", min: 1, defaultValue: 128 },
+    { name: "ram_gb", label: "RAM GB", type: "number", min: 1, defaultValue: 6 },
+    { name: "camera_mp", label: "Camera MP", type: "number", min: 1, defaultValue: 12 },
+    { name: "battery_mah", label: "Battery mAh", type: "number", min: 1, defaultValue: 4000 },
+  ],
+  toy: [
+    { name: "age_range", label: "Age range", defaultValue: "3+" },
+    { name: "material", label: "Material" },
+    { name: "safety_standard", label: "Safety standard" },
+  ],
+  tablet: [
+    { name: "os", label: "OS", defaultValue: "Android" },
+    { name: "screen_size_inch", label: "Screen size", type: "number", min: 1, step: "0.1", defaultValue: 10 },
+    { name: "storage_gb", label: "Storage GB", type: "number", min: 1, defaultValue: 128 },
+    { name: "supports_pen", label: "Supports pen", type: "boolean", defaultValue: false },
+  ],
+  headphones: [
+    { name: "connection_type", label: "Connection", defaultValue: "Bluetooth" },
+    { name: "noise_cancelling", label: "Noise cancelling", type: "boolean", defaultValue: false },
+    { name: "battery_hours", label: "Battery hours", type: "number", min: 0, defaultValue: 12 },
+  ],
+  camera: [
+    { name: "sensor_type", label: "Sensor type", defaultValue: "CMOS" },
+    { name: "megapixels", label: "Megapixels", type: "number", min: 1, step: "0.1", defaultValue: 24 },
+    { name: "lens_mount", label: "Lens mount" },
+    { name: "video_resolution", label: "Video resolution" },
+  ],
+  smart_watch: [
+    { name: "os", label: "OS", defaultValue: "Wear OS" },
+    { name: "battery_days", label: "Battery days", type: "number", min: 1, defaultValue: 1 },
+    { name: "water_resistant", label: "Water resistant", type: "boolean", defaultValue: false },
+    { name: "health_features", label: "Health features" },
+  ],
+  home_appliance: [
+    { name: "appliance_type", label: "Appliance type", defaultValue: "General" },
+    { name: "power_watts", label: "Power watts", type: "number", min: 0, defaultValue: 0 },
+    { name: "capacity", label: "Capacity" },
+    { name: "energy_rating", label: "Energy rating" },
+  ],
+  clothing: [
+    { name: "size", label: "Size", defaultValue: "M" },
+    { name: "color", label: "Color", defaultValue: "Black" },
+    { name: "material", label: "Material" },
+    { name: "gender", label: "Gender" },
+  ],
+};
 
 createRoot(document.getElementById("root")).render(<App />);
