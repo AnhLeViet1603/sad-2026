@@ -3,6 +3,7 @@ from django.db.models import Count
 from rest_framework.decorators import api_view
 
 from chatbot.models import ChatMessage, ChatSession, ProductDocument, RecommendationLog, UserBehavior
+from chatbot.ml.lstm_inference import lstm_recommendation_products
 from chatbot.serializers import ChatSerializer, TrackSerializer
 from chatbot.services import (
     generate_answer,
@@ -66,7 +67,12 @@ def home_recommendations(request):
     products = []
     source = "popular"
 
-    graph_products = graph_recommendation_products(user_id, limit=8)
+    lstm_products = lstm_recommendation_products(user_id, limit=8)
+    if lstm_products:
+        products = lstm_products
+        source = "lstm"
+
+    graph_products = graph_recommendation_products(user_id, limit=8) if not products else []
     if graph_products:
         products = graph_products
         source = "neo4j_graph"
@@ -91,6 +97,16 @@ def home_recommendations(request):
     payload = [product_payload(product, sources=[source]) for product in products]
     RecommendationLog.objects.create(user_id=user_id, product_ids=[item["id"] for item in payload], source=source)
     return ok({"source": source, "products": payload})
+
+
+@api_view(["GET"])
+def lstm_recommendations(request):
+    user_id = request.query_params.get("user_id") or request.user_id
+    exclude_product_id = request.query_params.get("exclude_product_id")
+    products = lstm_recommendation_products(user_id, limit=8, exclude_product_id=exclude_product_id)
+    payload = [product_payload(product, sources=["lstm"]) for product in products]
+    RecommendationLog.objects.create(user_id=user_id, product_ids=[item["id"] for item in payload], source="lstm")
+    return ok({"source": "lstm", "products": payload})
 
 
 @api_view(["GET"])

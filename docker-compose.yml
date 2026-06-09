@@ -223,8 +223,11 @@ services:
     env_file: .env
     environment:
       DB_NAME: ai_service
+      AI_MODEL_DIR: /app/models
     ports:
       - "8009:8009"
+    volumes:
+      - ai_models:/app/models
     depends_on:
       postgres:
         condition: service_healthy
@@ -250,3 +253,4 @@ volumes:
   postgres_data:
   mysql_data:
   neo4j_data:
+  ai_models:

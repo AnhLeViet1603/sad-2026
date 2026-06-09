@@ -15,6 +15,7 @@ SOURCE_LABELS = {
     "keyword": "matched your keywords",
     "vector": "semantically close to your question",
     "personalized": "related to your previous activity",
+    "lstm": "often added to cart after products like the one you selected",
 }
 STOPWORDS = {
     "a",
@@ -47,11 +48,15 @@ class GeminiError(Exception):
 
 
 def build_document(item):
+    type_details = item.get("type_details") or {}
+    detail_text = " ".join(f"{key} {value}" for key, value in type_details.items() if value not in (None, ""))
     parts = [
         item.get("name") or "",
         item.get("description") or "",
         item.get("category") or "",
         item.get("brand") or "",
+        item.get("product_type") or "",
+        detail_text,
         f"price {item.get('price')}",
         f"stock {item.get('stock')}",
     ]
@@ -77,6 +82,8 @@ def sync_products_from_service():
                 "description": item["description"],
                 "category": item.get("category"),
                 "brand": item.get("brand"),
+                "product_type": item.get("product_type"),
+                "type_details": item.get("type_details") or {},
                 "price": Decimal(str(item["price"])),
                 "stock": int(item.get("stock") or 0),
                 "document": document,
@@ -287,6 +294,8 @@ def product_payload(product, sources=None, score=None):
         "description": product.description,
         "category": product.category,
         "brand": product.brand,
+        "product_type": product.product_type,
+        "type_details": product.type_details,
         "price": str(product.price),
         "stock": product.stock,
         "sources": source_list,

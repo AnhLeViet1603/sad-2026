@@ -7,7 +7,7 @@ Dự án demo hệ thống thương mại điện tử theo kiến trúc microse
 | Thành phần | Công nghệ | Port local |
 | --- | --- | --- |
 | Frontend | React, Vite, Nginx | `3000` |
-| API Gateway | Django/DRF | `8000` |
+| API Gateway | Nginx reverse proxy | `8000` |
 | User Service | Django/DRF, MySQL | `8001` |
 | Staff Service | Django/DRF, MySQL | `8002` |
 | Product Service | Django/DRF, PostgreSQL | `8003` |
@@ -141,7 +141,7 @@ Response thành công có dạng:
   "success": true,
   "message": "Products synced",
   "data": {
-    "synced": 30
+    "synced": 24
   }
 }
 ```
@@ -173,7 +173,7 @@ Response thành công có dạng:
   "success": true,
   "message": "Embeddings rebuilt",
   "data": {
-    "embedded": 30
+    "embedded": 24
   }
 }
 ```
@@ -193,6 +193,16 @@ Tùy chọn seed hành vi demo cho Neo4j graph recommendation:
 ```bash
 docker compose exec ai_service python manage.py seed_graph_demo
 ```
+
+Train optional PyTorch LSTM recommendations from the bundled demo add-to-cart CSV:
+
+```bash
+docker compose exec ai_service python manage.py train_lstm_recommender \
+  --csv chatbot/ml/demo_cart_behavior.csv \
+  --epochs 8
+```
+
+The CSV contains 560 `ADDED_TO_CART` behavior rows. The trained model artifact is saved to `AI_MODEL_DIR` or `/app/models` by default. Existing AI chat, product sync, and embedding rebuild continue to work without the LSTM artifact; LSTM recommendations are used only when a trained artifact is available.
 
 ## API chính
 
@@ -218,6 +228,7 @@ AI:
 - `POST /api/ai/rebuild-embeddings`
 - `GET /api/ai/search?q=...`
 - `GET /api/ai/recommendations/home`
+- `GET /api/ai/recommendations/lstm`
 - `POST /api/ai/chat`
 - `POST /api/ai/track`
 

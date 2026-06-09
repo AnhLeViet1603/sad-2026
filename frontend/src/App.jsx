@@ -150,6 +150,7 @@ function StoreApp() {
     await api.post("/api/cart/items", { product_id: product.id, quantity: 1 });
     await api.post("/api/ai/track", { product_id: product.id, event_type: "ADDED_TO_CART" }).catch(() => {});
     await loadCart();
+    await loadRecommendations().catch(() => {});
     setMessage(`${product.name} was added to cart.`);
   }
 

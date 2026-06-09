@@ -8,6 +8,8 @@ class ProductDocument(models.Model):
     description = models.TextField()
     category = models.CharField(max_length=255, null=True, blank=True)
     brand = models.CharField(max_length=255, null=True, blank=True)
+    product_type = models.CharField(max_length=80, null=True, blank=True)
+    type_details = models.JSONField(default=dict, blank=True)
     price = models.DecimalField(max_digits=12, decimal_places=2)
     stock = models.PositiveIntegerField(default=0)
     document = models.TextField(default="")
